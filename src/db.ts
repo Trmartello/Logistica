@@ -131,17 +131,22 @@ function semearLocais(db: DatabaseSync): void {
     }
     // Origens/destinos já usados em fretes e ainda fora do cadastro entram
     // como locais personalizados (ex.: dados importados da planilha).
-    db.exec(`
-      INSERT INTO locais (nome, tipo, ordem)
-      SELECT v, 'PERSONALIZADO', 0
-        FROM (SELECT origem AS v FROM fretes UNION SELECT destino AS v FROM fretes)
-       WHERE NOT EXISTS (SELECT 1 FROM locais l WHERE l.nome = v COLLATE NOCASE)
-    `);
+    cadastrarLocaisDosFretes(db);
     db.exec('COMMIT');
   } catch (erro) {
     db.exec('ROLLBACK');
     throw erro;
   }
+}
+
+/** Cadastra como PERSONALIZADO todo origem/destino de frete fora da tabela locais. */
+export function cadastrarLocaisDosFretes(db: DatabaseSync): void {
+  db.exec(`
+    INSERT INTO locais (nome, tipo, ordem)
+    SELECT v, 'PERSONALIZADO', 0
+      FROM (SELECT origem AS v FROM fretes UNION SELECT destino AS v FROM fretes)
+     WHERE NOT EXISTS (SELECT 1 FROM locais l WHERE l.nome = v COLLATE NOCASE)
+  `);
 }
 
 export function createDb(path: string = caminhoPadraoBanco()): DatabaseSync {

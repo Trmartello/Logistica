@@ -104,6 +104,13 @@
     table.larguras-fixas { table-layout: fixed; }
     table.larguras-fixas td, table.larguras-fixas th { overflow: hidden; text-overflow: ellipsis; }
     #modal-colunas { width: min(440px, calc(100% - 24px)); }
+    #modal-importar { width: min(480px, calc(100% - 24px)); }
+    .texto-ajuda { font-size: 13px; color: var(--texto-suave); margin: 0 0 14px; line-height: 1.5; }
+    .linha-opcao { flex-direction: row; align-items: center; gap: 8px; margin-top: 12px; font-weight: 500; color: var(--texto); font-size: 14px; }
+    .linha-opcao input[type="checkbox"] { width: auto; min-height: 0; accent-color: var(--perigo); }
+    #mensagem-importar { font-size: 13px; }
+    #mensagem-importar.erro { color: var(--perigo); }
+    #mensagem-importar.ok { color: var(--bom); }
     .lista-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; padding-bottom: 14px; }
     .lista-colunas label { flex-direction: row; align-items: center; gap: 8px; font-weight: 500; color: var(--texto); font-size: 14px; }
     .lista-colunas input[type="checkbox"] { width: auto; min-height: 0; accent-color: var(--primaria); }
@@ -286,6 +293,7 @@
       <div class="topo-lista">
         <h2>Fretes cadastrados</h2>
         <div class="topo-acoes">
+          <button type="button" class="secundario" id="botao-importar" title="Importar planilha de fretes (.xlsx)">⬆ Importar planilha</button>
           <button type="button" class="secundario" id="botao-colunas" title="Escolher colunas e ordenação">⚙️ Colunas</button>
         </div>
       </div>
@@ -315,6 +323,31 @@
         </table>
       </div>
     </section>
+
+    <dialog id="modal-importar">
+      <div class="modal-cabecalho">
+        <h2>Importar planilha de fretes</h2>
+        <button type="button" class="fechar-modal" id="fechar-importar" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-corpo">
+        <p class="texto-ajuda">
+          Envie o arquivo <strong>.xlsx</strong> no formato da planilha BASE DADOS
+          (Motorista, Placa/CC, Data, Mês, Origem, Destino, Nota, Peso, Frete Valor, Frete Peso, Frete Total).
+          Células com várias notas (ex.: <code>183191 / 183192</code>) são separadas automaticamente.
+        </p>
+        <label>Arquivo
+          <input type="file" id="arquivo-importar" accept=".xlsx">
+        </label>
+        <label class="linha-opcao">
+          <input type="checkbox" id="limpar-antes">
+          Apagar todos os fretes atuais antes de importar (substituir tudo)
+        </label>
+        <div class="acoes-form">
+          <button type="button" id="botao-enviar-planilha">Importar</button>
+          <span id="mensagem-importar"></span>
+        </div>
+      </div>
+    </dialog>
 
     <dialog id="modal-colunas">
       <div class="modal-cabecalho">
@@ -746,6 +779,50 @@
       somentePendentes = false;
       atualizarChips();
       carregarFretes();
+    });
+
+    // --- Importação da planilha ---
+    const modalImportar = document.getElementById('modal-importar');
+    document.getElementById('botao-importar').addEventListener('click', () => {
+      document.getElementById('arquivo-importar').value = '';
+      document.getElementById('limpar-antes').checked = false;
+      document.getElementById('mensagem-importar').textContent = '';
+      modalImportar.showModal();
+    });
+    document.getElementById('fechar-importar').addEventListener('click', () => modalImportar.close());
+    modalImportar.addEventListener('click', (ev) => {
+      if (ev.target === modalImportar) modalImportar.close();
+    });
+    document.getElementById('botao-enviar-planilha').addEventListener('click', async () => {
+      const arquivo = document.getElementById('arquivo-importar').files[0];
+      const aviso = document.getElementById('mensagem-importar');
+      if (!arquivo) {
+        aviso.textContent = 'Escolha o arquivo .xlsx primeiro.';
+        aviso.className = 'erro';
+        return;
+      }
+      const limpar = document.getElementById('limpar-antes').checked;
+      if (limpar && !confirm('Apagar TODOS os fretes atuais e substituir pelos da planilha?')) return;
+      const botao = document.getElementById('botao-enviar-planilha');
+      botao.disabled = true;
+      aviso.textContent = 'Importando…';
+      aviso.className = '';
+      try {
+        const resultado = await api(`/api/importar${limpar ? '?limpar=1' : ''}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: arquivo,
+        });
+        aviso.textContent = `Importação concluída: ${resultado.importados} fretes importados` +
+          (resultado.ignorados > 0 ? `, ${resultado.ignorados} linhas ignoradas.` : '.');
+        aviso.className = 'ok';
+        await Promise.all([carregarFretes(), carregarOpcoes(), carregarResumo()]);
+      } catch (erro) {
+        aviso.textContent = erro.message;
+        aviso.className = 'erro';
+      } finally {
+        botao.disabled = false;
+      }
     });
 
     // --- Filtros rápidos (chips) ---
