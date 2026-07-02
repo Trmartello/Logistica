@@ -111,6 +111,58 @@ describe('fretes', () => {
     assert.equal(valorRuim.status, 400);
   });
 
+  it('aceita frete sem valor (pendente de lançamento) e permite lançar depois', async () => {
+    const criado = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({
+        motorista: 'Olmir',
+        data: '2026-03-05',
+        origem: 'Chapecó',
+        destino: 'Joaçaba',
+        peso_ton: 34.06,
+        notas: ['174487'],
+      }),
+    });
+    assert.equal(criado.status, 201);
+    assert.equal(criado.corpo.valor_ton, null);
+    assert.equal(criado.corpo.frete_total, null);
+    assert.equal(criado.corpo.pendente_valor, true);
+    assert.equal(criado.corpo.valor_por_nota, null);
+
+    const pendentes = await api('/api/fretes?pendentes=1');
+    assert.equal(pendentes.corpo.length, 1);
+    assert.equal(pendentes.corpo[0].id, criado.corpo.id);
+
+    const lancado = await api(`/api/fretes/${criado.corpo.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        motorista: 'Olmir',
+        data: '2026-03-05',
+        origem: 'Chapecó',
+        destino: 'Joaçaba',
+        peso_ton: 34.06,
+        valor_ton: 57,
+        notas: ['174487'],
+      }),
+    });
+    assert.equal(lancado.corpo.pendente_valor, false);
+    assert.equal(lancado.corpo.frete_total, 57 * 34);
+
+    const aposLancar = await api('/api/fretes?pendentes=1');
+    assert.equal(aposLancar.corpo.length, 0);
+  });
+
+  it('conta os fretes pendentes em /api/opcoes', async () => {
+    const antes = await api('/api/opcoes');
+    const criado = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({ motorista: 'Sergio', data: '2026-03-06', origem: 'A', destino: 'B' }),
+    });
+    const depois = await api('/api/opcoes');
+    assert.equal(depois.corpo.fretes_pendentes, antes.corpo.fretes_pendentes + 1);
+    await api(`/api/fretes/${criado.corpo.id}`, { method: 'DELETE' });
+  });
+
   it('atualiza frete substituindo as notas', async () => {
     const resp = await api(`/api/fretes/${freteId}`, {
       method: 'PUT',

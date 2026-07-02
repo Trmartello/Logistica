@@ -4,7 +4,7 @@ import { PESO_COBRANCA_PADRAO_TON } from '../db.js';
 
 interface Frete {
   id: number;
-  frete_total: number;
+  frete_total: number | null;
   [chave: string]: unknown;
 }
 
@@ -15,8 +15,8 @@ interface DadosFrete {
   origem: string;
   destino: string;
   peso_ton: number | null;
-  valor_ton: number;
-  frete_total: number;
+  valor_ton: number | null;
+  frete_total: number | null;
   notas: string[];
 }
 
@@ -24,7 +24,7 @@ function validarFrete(corpo: Record<string, unknown>): { erro: string } | { dado
   const { motorista, placa_cc, data, origem, destino, peso_ton, valor_ton, frete_total, notas } =
     corpo;
 
-  const obrigatorios: Record<string, unknown> = { motorista, data, origem, destino, valor_ton };
+  const obrigatorios: Record<string, unknown> = { motorista, data, origem, destino };
   const faltando = Object.keys(obrigatorios).filter(
     (c) => obrigatorios[c] == null || obrigatorios[c] === ''
   );
@@ -33,20 +33,25 @@ function validarFrete(corpo: Record<string, unknown>): { erro: string } | { dado
   if (typeof data !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
     return { erro: 'Campo data deve estar no formato YYYY-MM-DD' };
   }
-  const valor = Number(valor_ton);
-  if (!Number.isFinite(valor) || valor <= 0) {
+
+  // Valor é opcional: frete sem valor fica pendente de lançamento.
+  const valor = valor_ton == null || valor_ton === '' ? null : Number(valor_ton);
+  if (valor !== null && (!Number.isFinite(valor) || valor <= 0)) {
     return { erro: 'Campo valor_ton deve ser um número positivo' };
   }
   const peso = peso_ton == null || peso_ton === '' ? null : Number(peso_ton);
   if (peso !== null && (!Number.isFinite(peso) || peso < 0)) {
     return { erro: 'Campo peso_ton deve ser um número positivo' };
   }
-  const total =
-    frete_total == null || frete_total === ''
-      ? valor * PESO_COBRANCA_PADRAO_TON
-      : Number(frete_total);
-  if (!Number.isFinite(total) || total < 0) {
-    return { erro: 'Campo frete_total deve ser um número positivo' };
+
+  let total: number | null;
+  if (frete_total != null && frete_total !== '') {
+    total = Number(frete_total);
+    if (!Number.isFinite(total) || total < 0) {
+      return { erro: 'Campo frete_total deve ser um número positivo' };
+    }
+  } else {
+    total = valor !== null ? valor * PESO_COBRANCA_PADRAO_TON : null;
   }
 
   const listaNotas = Array.isArray(notas)
@@ -66,6 +71,11 @@ function validarFrete(corpo: Record<string, unknown>): { erro: string } | { dado
       notas: listaNotas,
     },
   };
+}
+
+function valorPorNota(freteTotal: number | null, quantidadeNotas: number): number | null {
+  if (freteTotal == null || quantidadeNotas === 0) return null;
+  return Number((freteTotal / quantidadeNotas).toFixed(2));
 }
 
 export function rotasFretes(db: DatabaseSync): Router {
@@ -89,13 +99,14 @@ export function rotasFretes(db: DatabaseSync): Router {
       return {
         ...f,
         notas,
-        valor_por_nota: notas.length > 0 ? Number((f.frete_total / notas.length).toFixed(2)) : null,
+        pendente_valor: f.frete_total == null,
+        valor_por_nota: valorPorNota(f.frete_total, notas.length),
       };
     });
   };
 
   router.get('/', (req, res) => {
-    const { mes, motorista, nota } = req.query;
+    const { mes, motorista, nota, pendentes } = req.query;
     const condicoes: string[] = [];
     const parametros: string[] = [];
 
@@ -113,6 +124,9 @@ export function rotasFretes(db: DatabaseSync): Router {
     if (typeof nota === 'string' && nota !== '') {
       condicoes.push('f.id IN (SELECT frete_id FROM notas WHERE numero LIKE ?)');
       parametros.push(`%${nota}%`);
+    }
+    if (pendentes === '1' || pendentes === 'true') {
+      condicoes.push('f.frete_total IS NULL');
     }
 
     const where = condicoes.length > 0 ? `WHERE ${condicoes.join(' AND ')}` : '';
@@ -226,23 +240,27 @@ export function rotaNotas(db: DatabaseSync): Router {
           WHERE n.numero = ?
           ORDER BY f.data DESC`
       )
-      .all(req.params.numero) as { frete_total: number; total_notas: number }[];
+      .all(req.params.numero) as { frete_total: number | null; total_notas: number }[];
     if (linhas.length === 0) return res.status(404).json({ erro: 'Nota não encontrada' });
     res.json(
       linhas.map((l) => ({
         ...l,
-        valor_por_nota: Number((l.frete_total / l.total_notas).toFixed(2)),
+        pendente_valor: l.frete_total == null,
+        valor_por_nota: valorPorNota(l.frete_total, l.total_notas),
       }))
     );
   });
   return router;
 }
 
-/** Valores distintos já cadastrados, para autocompletar o formulário. */
+/** Valores distintos já cadastrados (autocompletar) e contagem de pendências. */
 export function rotaOpcoes(db: DatabaseSync): Router {
   const router = Router();
   router.get('/', (_req, res) => {
     const coluna = (sql: string) => (db.prepare(sql).all() as { v: string }[]).map((l) => l.v);
+    const pendentes = db
+      .prepare('SELECT COUNT(*) AS total FROM fretes WHERE frete_total IS NULL')
+      .get() as { total: number };
     res.json({
       motoristas: coluna('SELECT DISTINCT motorista AS v FROM fretes ORDER BY motorista'),
       placas: coluna(
@@ -253,6 +271,7 @@ export function rotaOpcoes(db: DatabaseSync): Router {
            SELECT origem AS v FROM fretes UNION SELECT destino AS v FROM fretes
          ) ORDER BY v`
       ),
+      fretes_pendentes: pendentes.total,
     });
   });
   return router;

@@ -73,6 +73,14 @@
       display: inline-block; background: #eef2fa; border: 1px solid #ccd8ef; color: #1f4e96;
       border-radius: 5px; padding: 2px 8px; font-size: 13px; margin: 1px 2px;
     }
+    .badge-pendente {
+      display: inline-block; background: #fdf1d8; border: 1px solid #ecd9a0; color: #7a5a00;
+      border-radius: 5px; padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap;
+    }
+    tr.frete.pendente { border-left: 4px solid #e3a008; }
+    #filtro-pendentes { border-color: #e3a008; color: #7a5a00; background: transparent; font-weight: 700; }
+    #filtro-pendentes.ativo { background: #e3a008; color: #fff; }
+    td.celula-acoes .lancar { background: #e3a008; }
     .notas-celula { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
     .vazio { color: var(--texto-suave); padding: 24px; text-align: center; display: block; }
 
@@ -82,7 +90,7 @@
       .grade { grid-template-columns: repeat(4, 1fr); }
       .acoes-form { flex-direction: row; align-items: center; }
       .acoes-form button { width: auto; min-width: 160px; }
-      .filtros { grid-template-columns: 2fr 1fr 1fr auto; align-items: end; }
+      .filtros { grid-template-columns: 2fr 1fr 1fr auto auto; align-items: end; }
       .filtros .largura-toda { grid-column: auto; }
       input, select, button { font-size: 14px; padding: 9px 10px; min-height: 40px; }
       table { border: none; }
@@ -128,8 +136,8 @@
           <label>Peso (t)
             <input name="peso_ton" type="number" step="0.001" min="0" inputmode="decimal">
           </label>
-          <label>Valor (R$/t)*
-            <input name="valor_ton" type="number" step="0.01" min="0.01" required inputmode="decimal">
+          <label>Valor (R$/t)
+            <input name="valor_ton" type="number" step="0.01" min="0.01" inputmode="decimal" placeholder="vazio = lançar depois">
           </label>
           <label>Frete total (R$)
             <input name="frete_total" type="number" step="0.01" min="0" inputmode="decimal" placeholder="auto: 34 t × valor">
@@ -164,6 +172,7 @@
         <label>Motorista
           <select id="filtro-motorista"><option value="">Todos</option></select>
         </label>
+        <button type="button" id="filtro-pendentes" class="largura-toda">⚠ Sem valor lançado</button>
         <button type="button" class="secundario largura-toda" id="limpar-filtros">Limpar filtros</button>
       </div>
       <div class="resumo" id="resumo"></div>
@@ -189,6 +198,8 @@
     const fmtBRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
     const fmtNum = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
     let fretesAtuais = [];
+    let somentePendentes = false;
+    const dinheiro = (v) => (v != null ? fmtBRL.format(v) : '—');
 
     async function api(caminho, opcoes) {
       const resp = await fetch(caminho, opcoes);
@@ -248,14 +259,18 @@
       form.origem.value = frete.origem;
       form.destino.value = frete.destino;
       form.peso_ton.value = frete.peso_ton ?? '';
-      form.valor_ton.value = frete.valor_ton;
-      form.frete_total.value = frete.frete_total;
+      form.valor_ton.value = frete.valor_ton ?? '';
+      form.frete_total.value = frete.frete_total ?? '';
       limparCamposNota();
       frete.notas.forEach((n) => adicionarCampoNota(n));
-      document.getElementById('titulo-form').textContent = `Editar frete #${frete.id}`;
-      document.getElementById('botao-salvar').textContent = 'Atualizar frete';
+      const pendente = frete.pendente_valor;
+      document.getElementById('titulo-form').textContent = pendente
+        ? `Lançar valor do frete #${frete.id}`
+        : `Editar frete #${frete.id}`;
+      document.getElementById('botao-salvar').textContent = pendente ? 'Lançar valor' : 'Atualizar frete';
       document.getElementById('botao-cancelar').hidden = false;
       form.scrollIntoView({ behavior: 'smooth' });
+      if (pendente) form.valor_ton.focus();
     }
     function modoCadastro() {
       form.reset();
@@ -289,7 +304,9 @@
           body: JSON.stringify(dados),
         });
         mostrarMensagem(
-          `Frete de ${dataBR(salvo.data)} ${id ? 'atualizado' : 'cadastrado'} — total ${fmtBRL.format(salvo.frete_total)}.`,
+          salvo.pendente_valor
+            ? `Frete de ${dataBR(salvo.data)} ${id ? 'atualizado' : 'cadastrado'} — valor pendente de lançamento.`
+            : `Frete de ${dataBR(salvo.data)} ${id ? 'atualizado' : 'cadastrado'} — total ${dinheiro(salvo.frete_total)}.`,
           'ok'
         );
         modoCadastro();
@@ -309,6 +326,10 @@
       preencher('lista-motoristas', opcoes.motoristas);
       preencher('lista-placas', opcoes.placas);
       preencher('lista-cidades', opcoes.cidades);
+      const botaoPendentes = document.getElementById('filtro-pendentes');
+      botaoPendentes.textContent = opcoes.fretes_pendentes > 0
+        ? `⚠ Sem valor lançado (${opcoes.fretes_pendentes})`
+        : '⚠ Sem valor lançado';
       const selecao = document.getElementById('filtro-motorista');
       const atual = selecao.value;
       selecao.innerHTML = '<option value="">Todos</option>' + opcoes.motoristas
@@ -324,19 +345,22 @@
       if (nota) parametros.set('nota', nota);
       if (mes) parametros.set('mes', mes);
       if (motorista) parametros.set('motorista', motorista);
+      if (somentePendentes) parametros.set('pendentes', '1');
 
       fretesAtuais = await api('/api/fretes?' + parametros.toString());
       const corpo = document.getElementById('lista-fretes');
-      const soma = fretesAtuais.reduce((total, f) => total + f.frete_total, 0);
+      const soma = fretesAtuais.reduce((total, f) => total + (f.frete_total ?? 0), 0);
+      const pendentesNoFiltro = fretesAtuais.filter((f) => f.pendente_valor).length;
       document.getElementById('resumo').innerHTML =
-        `<strong>${fretesAtuais.length}</strong> frete(s) — total <strong>${fmtBRL.format(soma)}</strong>`;
+        `<strong>${fretesAtuais.length}</strong> frete(s) — total <strong>${fmtBRL.format(soma)}</strong>` +
+        (pendentesNoFiltro > 0 ? ` — <strong style="color:#7a5a00">${pendentesNoFiltro} sem valor</strong>` : '');
 
       if (fretesAtuais.length === 0) {
         corpo.innerHTML = '<tr><td colspan="11" class="vazio sem-rotulo">Nenhum frete encontrado</td></tr>';
         return;
       }
       corpo.innerHTML = fretesAtuais.map((f) => `
-        <tr class="frete">
+        <tr class="frete${f.pendente_valor ? ' pendente' : ''}">
           <td data-rotulo="Data">${dataBR(f.data)}</td>
           <td data-rotulo="Motorista">${f.motorista}</td>
           <td data-rotulo="Placa / CC">${f.placa_cc ?? '—'}</td>
@@ -344,11 +368,11 @@
           <td data-rotulo="Destino">${f.destino}</td>
           <td data-rotulo="Notas" class="notas-celula">${f.notas.length ? f.notas.map((n) => `<span class="badge-nota">${n}</span>`).join('') : '—'}</td>
           <td data-rotulo="Peso (t)" class="num">${f.peso_ton != null ? fmtNum.format(f.peso_ton) : '—'}</td>
-          <td data-rotulo="R$/t" class="num">${fmtBRL.format(f.valor_ton)}</td>
-          <td data-rotulo="Frete total" class="num destaque">${fmtBRL.format(f.frete_total)}</td>
-          <td data-rotulo="R$ / nota" class="num">${f.valor_por_nota != null ? fmtBRL.format(f.valor_por_nota) : '—'}</td>
+          <td data-rotulo="R$/t" class="num">${dinheiro(f.valor_ton)}</td>
+          <td data-rotulo="Frete total" class="num destaque">${f.pendente_valor ? '<span class="badge-pendente">SEM VALOR</span>' : dinheiro(f.frete_total)}</td>
+          <td data-rotulo="R$ / nota" class="num">${dinheiro(f.valor_por_nota)}</td>
           <td class="celula-acoes sem-rotulo">
-            <button type="button" class="secundario" data-editar="${f.id}">Editar</button>
+            <button type="button" class="${f.pendente_valor ? 'lancar' : 'secundario'}" data-editar="${f.id}">${f.pendente_valor ? 'Lançar valor' : 'Editar'}</button>
             <button type="button" class="excluir" data-excluir="${f.id}">Excluir</button>
           </td>
         </tr>`).join('');
@@ -379,10 +403,17 @@
     });
     document.getElementById('filtro-mes').addEventListener('change', carregarFretes);
     document.getElementById('filtro-motorista').addEventListener('change', carregarFretes);
+    document.getElementById('filtro-pendentes').addEventListener('click', (ev) => {
+      somentePendentes = !somentePendentes;
+      ev.currentTarget.classList.toggle('ativo', somentePendentes);
+      carregarFretes();
+    });
     document.getElementById('limpar-filtros').addEventListener('click', () => {
       document.getElementById('filtro-nota').value = '';
       document.getElementById('filtro-mes').value = '';
       document.getElementById('filtro-motorista').value = '';
+      somentePendentes = false;
+      document.getElementById('filtro-pendentes').classList.remove('ativo');
       carregarFretes();
     });
 

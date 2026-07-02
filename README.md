@@ -36,6 +36,10 @@ O importador lê a primeira aba, converte as datas do Excel e separa células co
 - **Frete total** é preenchido automaticamente como `34 t × valor` (capacidade do caminhão — regra usada em ~99% da planilha), mas o campo é editável para os casos cobrados por peso real.
 - **Valor por nota** = frete total ÷ quantidade de notas do frete.
 
+## Fretes sem valor (pendentes)
+
+O frete pode ser salvo **sem o valor** — ele fica marcado como pendente (flag `SEM VALOR`). O botão **"⚠ Sem valor lançado"** filtra só os pendentes e mostra a contagem, e o botão **"Lançar valor"** do frete abre o formulário direto no campo de valor. Na API: `GET /api/fretes?pendentes=1`.
+
 ## Testes e checagem de tipos
 
 ```bash
@@ -47,8 +51,8 @@ npm run typecheck
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/api/fretes?nota=&mes=YYYY-MM&motorista=` | Lista fretes com notas e valor por nota, com filtros opcionais |
-| POST | `/api/fretes` | Cadastra frete (`motorista`, `data`, `origem`, `destino`, `valor_ton` obrigatórios; `notas` é uma lista) |
+| GET | `/api/fretes?nota=&mes=YYYY-MM&motorista=&pendentes=1` | Lista fretes com notas e valor por nota, com filtros opcionais |
+| POST | `/api/fretes` | Cadastra frete (`motorista`, `data`, `origem`, `destino` obrigatórios; `valor_ton` opcional — sem ele o frete fica pendente; `notas` é uma lista) |
 | GET | `/api/fretes/:id` | Detalhes de um frete |
 | PUT | `/api/fretes/:id` | Atualiza o frete e substitui suas notas |
 | DELETE | `/api/fretes/:id` | Remove o frete e suas notas |
