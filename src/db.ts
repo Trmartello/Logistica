@@ -1,5 +1,21 @@
+import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { FILIAIS, MUNICIPIOS } from './dados/locais.js';
+
+/**
+ * Caminho padrão do banco: respeita DB_PATH; sem ela, usa automaticamente o
+ * volume persistente /data quando existir (Railway/Fly.io) — assim a
+ * hospedagem funciona sem configurar variável nenhuma.
+ */
+function caminhoPadraoBanco(): string {
+  if (process.env.DB_PATH) return process.env.DB_PATH;
+  try {
+    if (fs.statSync('/data').isDirectory()) return '/data/logistica.db';
+  } catch {
+    // /data não existe — uso local
+  }
+  return 'logistica.db';
+}
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS fretes (
@@ -128,10 +144,13 @@ function semearLocais(db: DatabaseSync): void {
   }
 }
 
-export function createDb(path: string = process.env.DB_PATH ?? 'logistica.db'): DatabaseSync {
+export function createDb(path: string = caminhoPadraoBanco()): DatabaseSync {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA foreign_keys = ON;');
-  if (path !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
+  if (path !== ':memory:') {
+    db.exec('PRAGMA journal_mode = WAL;');
+    console.log(`Banco de dados: ${path}`);
+  }
   db.exec(SCHEMA);
   migrarValorOpcional(db);
   migrarLocaisPersonalizados(db);
