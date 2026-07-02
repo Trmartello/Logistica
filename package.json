@@ -1,13 +1,13 @@
 {
   "name": "logistica",
   "version": "0.1.0",
-  "description": "Sistema de gestão de entregas — API REST + painel web",
+  "description": "Controle de fretes por nota fiscal — API REST + painel web",
   "type": "module",
   "main": "src/server.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "seed": "tsx src/seed.ts",
+    "importar": "tsx src/importar.ts",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -18,6 +18,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.0",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "xlsx": "^0.18.5"
   }
 }

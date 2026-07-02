@@ -31,106 +31,160 @@ after(() => {
   servidor.close();
 });
 
-describe('cadastros', () => {
-  it('cria e lista clientes', async () => {
-    const criado = await api('/api/clientes', {
-      method: 'POST',
-      body: JSON.stringify({ nome: 'Cliente Teste', email: 'teste@ex.com' }),
-    });
-    assert.equal(criado.status, 201);
-    assert.equal(criado.corpo.nome, 'Cliente Teste');
+describe('fretes', () => {
+  let freteId: number;
 
-    const lista = await api('/api/clientes');
-    assert.equal(lista.status, 200);
-    assert.equal(lista.corpo.length, 1);
+  it('cadastra frete com múltiplas notas e calcula o total padrão (34 t × valor)', async () => {
+    const resp = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({
+        motorista: 'Edipo',
+        placa_cc: 'RXX8D50 CC7202',
+        data: '2026-01-29',
+        origem: 'Concórdia',
+        destino: 'Campo Alegre',
+        peso_ton: 33.63,
+        valor_ton: 115,
+        notas: ['183191', '183192'],
+      }),
+    });
+    assert.equal(resp.status, 201);
+    assert.equal(resp.corpo.frete_total, 115 * 34);
+    assert.deepEqual(resp.corpo.notas, ['183191', '183192']);
+    assert.equal(resp.corpo.valor_por_nota, (115 * 34) / 2);
+    freteId = resp.corpo.id;
   });
 
-  it('rejeita cadastro sem campos obrigatórios', async () => {
-    const resp = await api('/api/motoristas', {
+  it('aceita frete_total informado manualmente (cobrança por peso real)', async () => {
+    const resp = await api('/api/fretes', {
       method: 'POST',
-      body: JSON.stringify({ nome: 'Sem CNH' }),
+      body: JSON.stringify({
+        motorista: 'Maycon',
+        data: '2025-11-04',
+        origem: 'Joaçaba',
+        destino: 'Concórdia',
+        peso_ton: 33.94,
+        valor_ton: 45,
+        frete_total: 1527.3,
+        notas: ['402017'],
+      }),
+    });
+    assert.equal(resp.status, 201);
+    assert.equal(resp.corpo.frete_total, 1527.3);
+  });
+
+  it('aceita frete sem nota', async () => {
+    const resp = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({
+        motorista: 'Darlan',
+        data: '2026-02-10',
+        origem: 'Capinzal',
+        destino: 'Joaçaba',
+        valor_ton: 43,
+      }),
+    });
+    assert.equal(resp.status, 201);
+    assert.deepEqual(resp.corpo.notas, []);
+    assert.equal(resp.corpo.valor_por_nota, null);
+  });
+
+  it('rejeita frete sem campos obrigatórios', async () => {
+    const resp = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({ motorista: 'Fulano' }),
     });
     assert.equal(resp.status, 400);
-    assert.match(resp.corpo.erro, /cnh/);
+    assert.match(resp.corpo.erro, /obrigatórios/);
   });
 
-  it('rejeita placa duplicada', async () => {
-    const dados = { placa: 'AAA1B11', modelo: 'Caminhão' };
-    const primeiro = await api('/api/veiculos', { method: 'POST', body: JSON.stringify(dados) });
-    assert.equal(primeiro.status, 201);
-    const duplicado = await api('/api/veiculos', { method: 'POST', body: JSON.stringify(dados) });
-    assert.equal(duplicado.status, 409);
+  it('rejeita data e valor inválidos', async () => {
+    const dataRuim = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({ motorista: 'F', data: '29/01/2026', origem: 'A', destino: 'B', valor_ton: 10 }),
+    });
+    assert.equal(dataRuim.status, 400);
+    const valorRuim = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({ motorista: 'F', data: '2026-01-29', origem: 'A', destino: 'B', valor_ton: -5 }),
+    });
+    assert.equal(valorRuim.status, 400);
+  });
+
+  it('atualiza frete substituindo as notas', async () => {
+    const resp = await api(`/api/fretes/${freteId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        motorista: 'Edipo',
+        placa_cc: 'RXX8D50 CC7202',
+        data: '2026-01-29',
+        origem: 'Concórdia',
+        destino: 'Campo Alegre',
+        peso_ton: 33.63,
+        valor_ton: 115,
+        frete_total: 3910,
+        notas: ['183191', '183192', '183193'],
+      }),
+    });
+    assert.equal(resp.status, 200);
+    assert.deepEqual(resp.corpo.notas, ['183191', '183192', '183193']);
+    assert.equal(resp.corpo.valor_por_nota, Number((3910 / 3).toFixed(2)));
+  });
+
+  it('filtra por nota, mês e motorista', async () => {
+    const porNota = await api('/api/fretes?nota=183192');
+    assert.equal(porNota.corpo.length, 1);
+    assert.equal(porNota.corpo[0].id, freteId);
+
+    const porMes = await api('/api/fretes?mes=2025-11');
+    assert.equal(porMes.corpo.length, 1);
+    assert.equal(porMes.corpo[0].motorista, 'Maycon');
+
+    const porMotorista = await api('/api/fretes?motorista=Darlan');
+    assert.equal(porMotorista.corpo.length, 1);
+
+    const mesInvalido = await api('/api/fretes?mes=novembro');
+    assert.equal(mesInvalido.status, 400);
+  });
+
+  it('exclui frete junto com as notas', async () => {
+    const criado = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({
+        motorista: 'Temp', data: '2026-03-01', origem: 'A', destino: 'B', valor_ton: 50, notas: ['999999'],
+      }),
+    });
+    const removido = await api(`/api/fretes/${criado.corpo.id}`, { method: 'DELETE' });
+    assert.equal(removido.status, 204);
+    const busca = await api('/api/notas/999999');
+    assert.equal(busca.status, 404);
   });
 });
 
-describe('entregas', () => {
-  let entregaId: number;
-  let codigo: string;
-
-  it('cria entrega com status PENDENTE e código de rastreio', async () => {
-    const resp = await api('/api/entregas', {
-      method: 'POST',
-      body: JSON.stringify({ cliente_id: 1, origem: 'São Paulo/SP', destino: 'Rio de Janeiro/RJ', peso_kg: 10 }),
-    });
-    assert.equal(resp.status, 201);
-    assert.equal(resp.corpo.status, 'PENDENTE');
-    assert.match(resp.corpo.codigo, /^LG-[0-9A-F]{8}$/);
-    entregaId = resp.corpo.id;
-    codigo = resp.corpo.codigo;
-  });
-
-  it('rejeita entrega para cliente inexistente', async () => {
-    const resp = await api('/api/entregas', {
-      method: 'POST',
-      body: JSON.stringify({ cliente_id: 999, origem: 'A', destino: 'B' }),
-    });
-    assert.equal(resp.status, 400);
-  });
-
-  it('avança o status seguindo o fluxo permitido', async () => {
-    const resp = await api(`/api/entregas/${entregaId}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'COLETADA', observacao: 'Coletada no depósito' }),
-    });
-    assert.equal(resp.status, 200);
-    assert.equal(resp.corpo.status, 'COLETADA');
-  });
-
-  it('rejeita transição de status inválida', async () => {
-    const resp = await api(`/api/entregas/${entregaId}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'ENTREGUE' }),
-    });
-    assert.equal(resp.status, 422);
-    assert.deepEqual(resp.corpo.proximos_status, ['EM_TRANSITO', 'CANCELADA']);
-  });
-
-  it('retorna detalhes com histórico de eventos', async () => {
-    const resp = await api(`/api/entregas/${entregaId}`);
-    assert.equal(resp.status, 200);
-    assert.equal(resp.corpo.eventos.length, 2);
-    assert.equal(resp.corpo.eventos[1].observacao, 'Coletada no depósito');
-  });
-
-  it('permite rastreio público pelo código', async () => {
-    const resp = await api(`/api/rastreio/${codigo}`);
-    assert.equal(resp.status, 200);
-    assert.equal(resp.corpo.codigo, codigo);
-    assert.equal(resp.corpo.eventos.length, 2);
-    assert.equal(resp.corpo.id, undefined);
-  });
-
-  it('retorna 404 para código de rastreio desconhecido', async () => {
-    const resp = await api('/api/rastreio/LG-NAOEXISTE');
-    assert.equal(resp.status, 404);
-  });
-
-  it('filtra entregas por status', async () => {
-    const resp = await api('/api/entregas?status=COLETADA');
+describe('consulta por nota', () => {
+  it('retorna o frete e o valor rateado da nota', async () => {
+    const resp = await api('/api/notas/183191');
     assert.equal(resp.status, 200);
     assert.equal(resp.corpo.length, 1);
+    assert.equal(resp.corpo[0].motorista, 'Edipo');
+    assert.equal(resp.corpo[0].total_notas, 3);
+    assert.equal(resp.corpo[0].valor_por_nota, Number((3910 / 3).toFixed(2)));
+  });
 
-    const invalido = await api('/api/entregas?status=QUALQUER');
-    assert.equal(invalido.status, 400);
+  it('retorna 404 para nota desconhecida', async () => {
+    const resp = await api('/api/notas/000000');
+    assert.equal(resp.status, 404);
+  });
+});
+
+describe('opções de autocompletar', () => {
+  it('lista motoristas, placas e cidades distintos', async () => {
+    const resp = await api('/api/opcoes');
+    assert.equal(resp.status, 200);
+    assert.ok(resp.corpo.motoristas.includes('Edipo'));
+    assert.ok(resp.corpo.motoristas.includes('Maycon'));
+    assert.ok(resp.corpo.placas.includes('RXX8D50 CC7202'));
+    assert.ok(resp.corpo.cidades.includes('Concórdia'));
+    assert.ok(resp.corpo.cidades.includes('Campo Alegre'));
   });
 });

@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Logística — Painel de Entregas</title>
+  <title>Logística — Controle de Fretes</title>
   <style>
     :root {
       --fundo: #f4f5f7; --superficie: #ffffff; --borda: #e0e2e8;
-      --texto: #1e2430; --texto-suave: #6a7181; --primaria: #1f5fbf;
+      --texto: #1e2430; --texto-suave: #6a7181; --primaria: #1f5fbf; --perigo: #b3261e;
     }
     * { box-sizing: border-box; }
     body {
@@ -19,20 +19,16 @@
       padding: 16px 24px; display: flex; align-items: center; gap: 12px;
     }
     header h1 { font-size: 18px; margin: 0; }
-    main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    main { max-width: 1200px; margin: 0 auto; padding: 24px; }
     section { background: var(--superficie); border: 1px solid var(--borda); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
     h2 { font-size: 15px; margin: 0 0 16px; }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--borda); }
-    th { color: var(--texto-suave); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--borda); white-space: nowrap; }
+    td.quebra { white-space: normal; }
+    th { color: var(--texto-suave); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .num { text-align: right; }
     .tabela-scroll { overflow-x: auto; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-    .badge.PENDENTE   { background: #fdf1d8; color: #7a5a00; }
-    .badge.COLETADA   { background: #e3ecfb; color: #1f4e96; }
-    .badge.EM_TRANSITO{ background: #e7e3fb; color: #4a3a96; }
-    .badge.ENTREGUE   { background: #ddf2e4; color: #1a6b3c; }
-    .badge.CANCELADA  { background: #fbe3e3; color: #96261f; }
-    form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
     label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--texto-suave); font-weight: 600; }
     input, select, button {
       padding: 8px 10px; border: 1px solid var(--borda); border-radius: 6px;
@@ -40,74 +36,116 @@
     }
     button { background: var(--primaria); color: #fff; border: none; cursor: pointer; font-weight: 600; }
     button:hover { filter: brightness(1.1); }
-    button.acao { background: transparent; color: var(--primaria); border: 1px solid var(--primaria); padding: 4px 10px; font-size: 12px; }
-    .filtros { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-    .filtros button { background: transparent; color: var(--texto-suave); border: 1px solid var(--borda); font-size: 13px; }
-    .filtros button.ativo { background: var(--primaria); color: #fff; border-color: var(--primaria); }
-    .vazio { color: var(--texto-suave); padding: 24px; text-align: center; }
-    #mensagem { margin-top: 12px; font-size: 13px; }
-    #mensagem.erro { color: #96261f; }
+    button.secundario { background: transparent; color: var(--primaria); border: 1px solid var(--primaria); }
+    button.excluir { background: transparent; color: var(--perigo); border: none; padding: 2px 6px; font-size: 15px; }
+    .notas-area { margin-top: 14px; }
+    .notas-linha { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .notas-linha input { width: 150px; }
+    .badge-nota { display: inline-block; background: #eef2fa; border: 1px solid #ccd8ef; color: #1f4e96; border-radius: 4px; padding: 1px 7px; font-size: 12px; margin: 1px 2px; }
+    .acoes-form { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
+    #mensagem { font-size: 13px; }
+    #mensagem.erro { color: var(--perigo); }
     #mensagem.ok { color: #1a6b3c; }
+    .filtros { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: end; }
+    .filtros label { min-width: 150px; }
+    .resumo { font-size: 13px; color: var(--texto-suave); margin-bottom: 8px; }
+    .resumo strong { color: var(--texto); }
+    .vazio { color: var(--texto-suave); padding: 24px; text-align: center; }
   </style>
 </head>
 <body>
   <header>
-    <h1>📦 Logística — Painel de Entregas</h1>
+    <h1>🚛 Logística — Controle de Fretes</h1>
   </header>
   <main>
     <section>
-      <h2>Nova entrega</h2>
-      <form id="form-entrega">
-        <label>Cliente*
-          <select name="cliente_id" required></select>
-        </label>
-        <label>Motorista
-          <select name="motorista_id"><option value="">—</option></select>
-        </label>
-        <label>Veículo
-          <select name="veiculo_id"><option value="">—</option></select>
-        </label>
-        <label>Origem*
-          <input name="origem" required placeholder="Cidade/UF">
-        </label>
-        <label>Destino*
-          <input name="destino" required placeholder="Cidade/UF">
-        </label>
-        <label>Peso (kg)
-          <input name="peso_kg" type="number" step="0.1" min="0">
-        </label>
-        <label>&nbsp;
-          <button type="submit">Registrar entrega</button>
-        </label>
+      <h2 id="titulo-form">Cadastrar frete</h2>
+      <form id="form-frete">
+        <input type="hidden" name="id">
+        <div class="grade">
+          <label>Motorista*
+            <input name="motorista" list="lista-motoristas" required>
+          </label>
+          <label>Placa / CC
+            <input name="placa_cc" list="lista-placas">
+          </label>
+          <label>Data*
+            <input name="data" type="date" required>
+          </label>
+          <label>Origem*
+            <input name="origem" list="lista-cidades" required>
+          </label>
+          <label>Destino*
+            <input name="destino" list="lista-cidades" required>
+          </label>
+          <label>Peso (t)
+            <input name="peso_ton" type="number" step="0.001" min="0">
+          </label>
+          <label>Valor (R$/t)*
+            <input name="valor_ton" type="number" step="0.01" min="0.01" required>
+          </label>
+          <label>Frete total (R$)
+            <input name="frete_total" type="number" step="0.01" min="0" placeholder="auto: 34 t × valor">
+          </label>
+        </div>
+        <div class="notas-area">
+          <label>Notas fiscais</label>
+          <div class="notas-linha" id="notas-linha">
+            <button type="button" class="secundario" id="add-nota">+ nota</button>
+          </div>
+        </div>
+        <div class="acoes-form">
+          <button type="submit" id="botao-salvar">Salvar frete</button>
+          <button type="button" class="secundario" id="botao-cancelar" hidden>Cancelar edição</button>
+          <span id="mensagem"></span>
+        </div>
       </form>
-      <div id="mensagem"></div>
+      <datalist id="lista-motoristas"></datalist>
+      <datalist id="lista-placas"></datalist>
+      <datalist id="lista-cidades"></datalist>
     </section>
 
     <section>
-      <h2>Entregas</h2>
-      <div class="filtros" id="filtros"></div>
+      <h2>Fretes cadastrados</h2>
+      <div class="filtros">
+        <label>Buscar por nota
+          <input id="filtro-nota" placeholder="nº da nota">
+        </label>
+        <label>Mês
+          <input id="filtro-mes" type="month">
+        </label>
+        <label>Motorista
+          <select id="filtro-motorista"><option value="">Todos</option></select>
+        </label>
+        <button type="button" class="secundario" id="limpar-filtros">Limpar</button>
+      </div>
+      <div class="resumo" id="resumo"></div>
       <div class="tabela-scroll">
         <table>
           <thead>
             <tr>
-              <th>Código</th><th>Cliente</th><th>Origem</th><th>Destino</th>
-              <th>Motorista</th><th>Veículo</th><th>Status</th><th>Ações</th>
+              <th>Data</th><th>Motorista</th><th>Placa / CC</th><th>Origem</th><th>Destino</th>
+              <th>Notas</th><th class="num">Peso (t)</th><th class="num">R$/t</th>
+              <th class="num">Frete total</th><th class="num">R$ / nota</th><th></th>
             </tr>
           </thead>
-          <tbody id="lista-entregas"></tbody>
+          <tbody id="lista-fretes"></tbody>
         </table>
       </div>
     </section>
   </main>
 
   <script>
-    const STATUS = ['', 'PENDENTE', 'COLETADA', 'EM_TRANSITO', 'ENTREGUE', 'CANCELADA'];
-    const PROXIMO = { PENDENTE: 'COLETADA', COLETADA: 'EM_TRANSITO', EM_TRANSITO: 'ENTREGUE' };
-    let filtroAtual = '';
+    const form = document.getElementById('form-frete');
+    const notasLinha = document.getElementById('notas-linha');
+    const addNotaBtn = document.getElementById('add-nota');
+    const fmtBRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+    const fmtNum = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
+    let fretesAtuais = [];
 
     async function api(caminho, opcoes) {
       const resp = await fetch(caminho, opcoes);
-      const dados = await resp.json().catch(() => null);
+      const dados = resp.status === 204 ? null : await resp.json().catch(() => null);
       if (!resp.ok) throw new Error(dados?.erro || 'Erro na requisição');
       return dados;
     }
@@ -116,97 +154,184 @@
       const el = document.getElementById('mensagem');
       el.textContent = texto;
       el.className = tipo;
+      if (tipo === 'ok') setTimeout(() => { el.textContent = ''; }, 5000);
     }
 
-    async function carregarSelecoes() {
-      const [clientes, motoristas, veiculos] = await Promise.all([
-        api('/api/clientes'), api('/api/motoristas'), api('/api/veiculos'),
-      ]);
-      const form = document.getElementById('form-entrega');
-      form.cliente_id.innerHTML = clientes
-        .map((c) => `<option value="${c.id}">${c.nome}</option>`).join('');
-      form.motorista_id.innerHTML = '<option value="">—</option>' + motoristas
-        .map((m) => `<option value="${m.id}">${m.nome}</option>`).join('');
-      form.veiculo_id.innerHTML = '<option value="">—</option>' + veiculos
-        .map((v) => `<option value="${v.id}">${v.placa} — ${v.modelo ?? ''}</option>`).join('');
+    function dataBR(iso) {
+      const [a, m, d] = iso.split('-');
+      return `${d}/${m}/${a.slice(2)}`;
     }
 
-    function desenharFiltros() {
-      document.getElementById('filtros').innerHTML = STATUS
-        .map((s) => `<button data-status="${s}" class="${s === filtroAtual ? 'ativo' : ''}">${s || 'Todas'}</button>`)
-        .join('');
+    // --- Campos dinâmicos de nota ---
+    function adicionarCampoNota(valor = '') {
+      const input = document.createElement('input');
+      input.placeholder = 'nº da nota';
+      input.className = 'campo-nota';
+      input.value = valor;
+      notasLinha.insertBefore(input, addNotaBtn);
+      input.focus();
+      return input;
+    }
+    addNotaBtn.addEventListener('click', () => adicionarCampoNota());
+    function lerNotas() {
+      return [...notasLinha.querySelectorAll('.campo-nota')]
+        .map((c) => c.value.trim())
+        .filter((v) => v !== '');
+    }
+    function limparCamposNota() {
+      notasLinha.querySelectorAll('.campo-nota').forEach((c) => c.remove());
     }
 
-    async function carregarEntregas() {
-      const query = filtroAtual ? `?status=${filtroAtual}` : '';
-      const entregas = await api('/api/entregas' + query);
-      const corpo = document.getElementById('lista-entregas');
-      if (entregas.length === 0) {
-        corpo.innerHTML = '<tr><td colspan="8" class="vazio">Nenhuma entrega encontrada</td></tr>';
-        return;
-      }
-      corpo.innerHTML = entregas.map((e) => `
-        <tr>
-          <td><strong>${e.codigo}</strong></td>
-          <td>${e.cliente_nome}</td>
-          <td>${e.origem}</td>
-          <td>${e.destino}</td>
-          <td>${e.motorista_nome ?? '—'}</td>
-          <td>${e.veiculo_placa ?? '—'}</td>
-          <td><span class="badge ${e.status}">${e.status.replace('_', ' ')}</span></td>
-          <td>
-            ${PROXIMO[e.status] ? `<button class="acao" data-id="${e.id}" data-proximo="${PROXIMO[e.status]}">→ ${PROXIMO[e.status].replace('_', ' ')}</button>` : ''}
-          </td>
-        </tr>`).join('');
+    // --- Formulário (cadastro e edição) ---
+    function modoEdicao(frete) {
+      form.id.value = frete.id;
+      form.motorista.value = frete.motorista;
+      form.placa_cc.value = frete.placa_cc ?? '';
+      form.data.value = frete.data;
+      form.origem.value = frete.origem;
+      form.destino.value = frete.destino;
+      form.peso_ton.value = frete.peso_ton ?? '';
+      form.valor_ton.value = frete.valor_ton;
+      form.frete_total.value = frete.frete_total;
+      limparCamposNota();
+      frete.notas.forEach((n) => adicionarCampoNota(n));
+      document.getElementById('titulo-form').textContent = `Editar frete #${frete.id}`;
+      document.getElementById('botao-salvar').textContent = 'Atualizar frete';
+      document.getElementById('botao-cancelar').hidden = false;
+      form.scrollIntoView({ behavior: 'smooth' });
     }
+    function modoCadastro() {
+      form.reset();
+      form.id.value = '';
+      limparCamposNota();
+      adicionarCampoNota();
+      document.getElementById('titulo-form').textContent = 'Cadastrar frete';
+      document.getElementById('botao-salvar').textContent = 'Salvar frete';
+      document.getElementById('botao-cancelar').hidden = true;
+    }
+    document.getElementById('botao-cancelar').addEventListener('click', modoCadastro);
 
-    document.getElementById('filtros').addEventListener('click', (ev) => {
-      const botao = ev.target.closest('button[data-status]');
-      if (!botao) return;
-      filtroAtual = botao.dataset.status;
-      desenharFiltros();
-      carregarEntregas();
-    });
-
-    document.getElementById('lista-entregas').addEventListener('click', async (ev) => {
-      const botao = ev.target.closest('button[data-id]');
-      if (!botao) return;
-      try {
-        await api(`/api/entregas/${botao.dataset.id}/status`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: botao.dataset.proximo }),
-        });
-        carregarEntregas();
-      } catch (erro) {
-        alert(erro.message);
-      }
-    });
-
-    document.getElementById('form-entrega').addEventListener('submit', async (ev) => {
+    form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      const form = ev.target;
-      const dados = Object.fromEntries(new FormData(form).entries());
-      for (const chave of ['motorista_id', 'veiculo_id', 'peso_kg']) {
-        if (dados[chave] === '') delete dados[chave];
-      }
+      const dados = {
+        motorista: form.motorista.value,
+        placa_cc: form.placa_cc.value || null,
+        data: form.data.value,
+        origem: form.origem.value,
+        destino: form.destino.value,
+        peso_ton: form.peso_ton.value || null,
+        valor_ton: form.valor_ton.value,
+        frete_total: form.frete_total.value || null,
+        notas: lerNotas(),
+      };
+      const id = form.id.value;
       try {
-        const criada = await api('/api/entregas', {
-          method: 'POST',
+        const salvo = await api(id ? `/api/fretes/${id}` : '/api/fretes', {
+          method: id ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(dados),
         });
-        mostrarMensagem(`Entrega ${criada.codigo} registrada com sucesso.`, 'ok');
-        form.reset();
-        carregarEntregas();
+        mostrarMensagem(
+          `Frete de ${dataBR(salvo.data)} ${id ? 'atualizado' : 'cadastrado'} — total ${fmtBRL.format(salvo.frete_total)}.`,
+          'ok'
+        );
+        modoCadastro();
+        await Promise.all([carregarFretes(), carregarOpcoes()]);
       } catch (erro) {
         mostrarMensagem(erro.message, 'erro');
       }
     });
 
-    desenharFiltros();
-    carregarSelecoes().catch(() => mostrarMensagem('Erro ao carregar cadastros', 'erro'));
-    carregarEntregas().catch(() => {});
+    // --- Listagem, filtros e resumo ---
+    async function carregarOpcoes() {
+      const opcoes = await api('/api/opcoes');
+      const preencher = (id, valores) => {
+        document.getElementById(id).innerHTML = valores
+          .map((v) => `<option value="${v}"></option>`).join('');
+      };
+      preencher('lista-motoristas', opcoes.motoristas);
+      preencher('lista-placas', opcoes.placas);
+      preencher('lista-cidades', opcoes.cidades);
+      const selecao = document.getElementById('filtro-motorista');
+      const atual = selecao.value;
+      selecao.innerHTML = '<option value="">Todos</option>' + opcoes.motoristas
+        .map((m) => `<option value="${m}">${m}</option>`).join('');
+      selecao.value = atual;
+    }
+
+    async function carregarFretes() {
+      const parametros = new URLSearchParams();
+      const nota = document.getElementById('filtro-nota').value.trim();
+      const mes = document.getElementById('filtro-mes').value;
+      const motorista = document.getElementById('filtro-motorista').value;
+      if (nota) parametros.set('nota', nota);
+      if (mes) parametros.set('mes', mes);
+      if (motorista) parametros.set('motorista', motorista);
+
+      fretesAtuais = await api('/api/fretes?' + parametros.toString());
+      const corpo = document.getElementById('lista-fretes');
+      const soma = fretesAtuais.reduce((total, f) => total + f.frete_total, 0);
+      document.getElementById('resumo').innerHTML =
+        `<strong>${fretesAtuais.length}</strong> frete(s) — total <strong>${fmtBRL.format(soma)}</strong>`;
+
+      if (fretesAtuais.length === 0) {
+        corpo.innerHTML = '<tr><td colspan="11" class="vazio">Nenhum frete encontrado</td></tr>';
+        return;
+      }
+      corpo.innerHTML = fretesAtuais.map((f) => `
+        <tr>
+          <td>${dataBR(f.data)}</td>
+          <td>${f.motorista}</td>
+          <td>${f.placa_cc ?? '—'}</td>
+          <td>${f.origem}</td>
+          <td>${f.destino}</td>
+          <td class="quebra">${f.notas.length ? f.notas.map((n) => `<span class="badge-nota">${n}</span>`).join('') : '—'}</td>
+          <td class="num">${f.peso_ton != null ? fmtNum.format(f.peso_ton) : '—'}</td>
+          <td class="num">${fmtBRL.format(f.valor_ton)}</td>
+          <td class="num"><strong>${fmtBRL.format(f.frete_total)}</strong></td>
+          <td class="num">${f.valor_por_nota != null ? fmtBRL.format(f.valor_por_nota) : '—'}</td>
+          <td>
+            <button type="button" class="secundario" data-editar="${f.id}">Editar</button>
+            <button type="button" class="excluir" data-excluir="${f.id}" title="Excluir">✕</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('lista-fretes').addEventListener('click', async (ev) => {
+      const editar = ev.target.closest('button[data-editar]');
+      if (editar) {
+        const frete = fretesAtuais.find((f) => f.id === Number(editar.dataset.editar));
+        if (frete) modoEdicao(frete);
+        return;
+      }
+      const excluir = ev.target.closest('button[data-excluir]');
+      if (excluir && confirm('Excluir este frete e suas notas?')) {
+        try {
+          await api(`/api/fretes/${excluir.dataset.excluir}`, { method: 'DELETE' });
+          carregarFretes();
+        } catch (erro) {
+          alert(erro.message);
+        }
+      }
+    });
+
+    let temporizador;
+    document.getElementById('filtro-nota').addEventListener('input', () => {
+      clearTimeout(temporizador);
+      temporizador = setTimeout(carregarFretes, 300);
+    });
+    document.getElementById('filtro-mes').addEventListener('change', carregarFretes);
+    document.getElementById('filtro-motorista').addEventListener('change', carregarFretes);
+    document.getElementById('limpar-filtros').addEventListener('click', () => {
+      document.getElementById('filtro-nota').value = '';
+      document.getElementById('filtro-mes').value = '';
+      document.getElementById('filtro-motorista').value = '';
+      carregarFretes();
+    });
+
+    modoCadastro();
+    carregarOpcoes().catch(() => {});
+    carregarFretes().catch(() => mostrarMensagem('Erro ao carregar fretes', 'erro'));
   </script>
 </body>
 </html>

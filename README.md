@@ -1,25 +1,40 @@
-# Logística
+# Logística — Controle de Fretes
 
-Sistema de gestão de entregas: API REST + painel web para registrar entregas, acompanhar o ciclo de vida de cada envio e consultar rastreamento por código.
+Sistema para registrar fretes e consultar o valor do frete por nota fiscal. Cada frete pode ter **uma ou mais notas** — e o sistema calcula automaticamente o valor rateado por nota.
+
+Substitui a planilha "BASE DADOS" (Motorista | Placa/CC | Data | Origem | Destino | Nota | Peso | Frete Valor | Frete Total), com a vantagem de que notas múltiplas viram registros separados em vez de texto na mesma célula.
 
 ## Stack
 
 - **Node.js 22+** com **TypeScript** (executado via `tsx`, sem etapa de build)
 - **Express 5** para a API REST
 - **SQLite** via módulo nativo `node:sqlite` (zero dependências de banco)
-- Painel web em HTML/JS puro servido pela própria API
+- Tela em HTML/JS puro servida pela própria API
 
 ## Como rodar
 
 ```bash
 npm install
-npm run seed   # popula dados de exemplo (opcional)
 npm run dev    # inicia em http://localhost:3000 com hot reload
 ```
 
-O painel de entregas fica disponível em `http://localhost:3000`.
+A tela de cadastro e consulta fica em `http://localhost:3000`.
 
 Variáveis de ambiente: `PORT` (padrão `3000`) e `DB_PATH` (padrão `logistica.db`).
+
+## Importar a planilha existente
+
+```bash
+npm run importar -- caminho/para/planilha.xlsx
+```
+
+O importador lê a primeira aba, converte as datas do Excel e separa células com múltiplas notas (`183191 / 183192`) em registros individuais. Linhas sem dados essenciais são listadas como ignoradas.
+
+## Regra de cálculo
+
+- **Valor (R$/t)** é o preço por tonelada do trecho.
+- **Frete total** é preenchido automaticamente como `34 t × valor` (capacidade do caminhão — regra usada em ~99% da planilha), mas o campo é editável para os casos cobrados por peso real.
+- **Valor por nota** = frete total ÷ quantidade de notas do frete.
 
 ## Testes e checagem de tipos
 
@@ -28,39 +43,17 @@ npm test        # suíte de testes de API (node:test)
 npm run typecheck
 ```
 
-## Domínio
-
-Entidades principais:
-
-- **Clientes** — quem solicita as entregas
-- **Motoristas** e **Veículos** — recursos da operação
-- **Entregas** — cada envio, com código de rastreio único (`LG-XXXXXXXX`)
-- **Eventos de entrega** — histórico de cada mudança de status
-
-Fluxo de status de uma entrega:
-
-```
-PENDENTE → COLETADA → EM_TRANSITO → ENTREGUE
-     └──────────┴──────────┴→ CANCELADA
-```
-
-Transições fora desse fluxo são rejeitadas pela API com `422`.
-
 ## Endpoints da API
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET/POST | `/api/clientes` | Lista / cria clientes |
-| GET/PUT/DELETE | `/api/clientes/:id` | Consulta / atualiza / remove cliente |
-| GET/POST | `/api/motoristas` | Lista / cria motoristas (CNH única) |
-| GET/PUT/DELETE | `/api/motoristas/:id` | Consulta / atualiza / remove motorista |
-| GET/POST | `/api/veiculos` | Lista / cria veículos (placa única) |
-| GET/PUT/DELETE | `/api/veiculos/:id` | Consulta / atualiza / remove veículo |
-| GET | `/api/entregas?status=...` | Lista entregas, com filtro opcional por status |
-| POST | `/api/entregas` | Cria entrega (`cliente_id`, `origem`, `destino` obrigatórios) |
-| GET | `/api/entregas/:id` | Detalhes com histórico de eventos e próximos status |
-| PATCH | `/api/entregas/:id/status` | Avança o status (`status`, `observacao` opcional) |
-| GET | `/api/rastreio/:codigo` | Consulta pública de rastreamento pelo código |
+| GET | `/api/fretes?nota=&mes=YYYY-MM&motorista=` | Lista fretes com notas e valor por nota, com filtros opcionais |
+| POST | `/api/fretes` | Cadastra frete (`motorista`, `data`, `origem`, `destino`, `valor_ton` obrigatórios; `notas` é uma lista) |
+| GET | `/api/fretes/:id` | Detalhes de um frete |
+| PUT | `/api/fretes/:id` | Atualiza o frete e substitui suas notas |
+| DELETE | `/api/fretes/:id` | Remove o frete e suas notas |
+| GET | `/api/notas/:numero` | Consulta o(s) frete(s) de uma nota, com valor rateado |
+| GET | `/api/opcoes` | Motoristas, placas e cidades já cadastrados (autocompletar) |
 
 ## Estrutura do projeto
 
@@ -68,21 +61,19 @@ Transições fora desse fluxo são rejeitadas pela API com `422`.
 src/
   server.ts          # ponto de entrada
   app.ts             # montagem do Express e das rotas
-  db.ts              # conexão SQLite + schema
-  status.ts          # máquina de estados das entregas
-  seed.ts            # dados de exemplo
+  db.ts              # conexão SQLite + schema (fretes, notas)
+  importar.ts        # importador da planilha .xlsx
   rotas/
-    cadastros.ts     # CRUD genérico (clientes, motoristas, veículos)
-    entregas.ts      # entregas, status e rastreio
+    fretes.ts        # CRUD de fretes, consulta por nota, opções
 public/
-  index.html         # painel web
+  index.html         # tela de cadastro e consulta
 test/
   api.test.ts        # testes de integração da API
 ```
 
 ## Próximos passos possíveis
 
-- Autenticação e perfis de usuário (operador, motorista, cliente)
-- Cadastro pelo painel (hoje clientes/motoristas/veículos entram só pela API ou seed)
-- Cálculo de frete e otimização de rotas
-- Notificações de mudança de status (e-mail/WhatsApp)
+- Exportar para Excel/CSV (relatório mensal por motorista)
+- Autenticação de usuários
+- Relatórios: total por motorista, por rota, por mês
+- Anexar comprovantes (CT-e/canhoto) ao frete
