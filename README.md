@@ -36,6 +36,16 @@ O importador lê a primeira aba, converte as datas do Excel e separa células co
 - **Frete total** é preenchido automaticamente como `34 t × valor` (capacidade do caminhão — regra usada em ~99% da planilha), mas o campo é editável para os casos cobrados por peso real.
 - **Valor por nota** = frete total ÷ quantidade de notas do frete.
 
+## Origem e destino (locais)
+
+Os campos de origem e destino sugerem, nesta ordem:
+
+1. **Filiais** — 109 registros no formato `2 - LINDOIA DO SUL` (extraídos da coluna `FlagFilial` do QVD de filiais);
+2. **Municípios do Brasil** — 5.571 registros no formato `CONCÓRDIA - SC` (base oficial do IBGE);
+3. Valores livres já usados em fretes anteriores.
+
+Assim o frete pode ser identificado pela filial ou pelo município, na origem e/ou no destino. Os locais são semeados automaticamente no banco na primeira execução (tabela `locais`) e não precisam de atualização; digitar um valor fora da lista continua permitido.
+
 ## Fretes sem valor (pendentes)
 
 O frete pode ser salvo **sem o valor** — ele fica marcado como pendente (flag `SEM VALOR`). O botão **"⚠ Sem valor lançado"** filtra só os pendentes e mostra a contagem, e o botão **"Lançar valor"** do frete abre o formulário direto no campo de valor. Na API: `GET /api/fretes?pendentes=1`.

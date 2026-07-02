@@ -240,18 +240,20 @@ describe('opções de autocompletar', () => {
     assert.ok(resp.corpo.cidades.includes('Campo Alegre'));
   });
 
-  it('inclui filiais primeiro e municípios-UF em seguida nas cidades', async () => {
+  it('inclui filiais primeiro e municípios-UF do IBGE em seguida nas cidades', async () => {
     const resp = await api('/api/opcoes');
     const { cidades } = resp.corpo;
     assert.ok(cidades.includes('1 - MATRIZ'));
     assert.ok(cidades.includes('2 - LINDOIA DO SUL'));
-    assert.ok(cidades.includes('LINDOIA DO SUL - SC'));
-    assert.ok(cidades.includes('CONCORDIA - SC'));
+    assert.ok(cidades.includes('CONCÓRDIA - SC'));
+    assert.ok(cidades.includes('SÃO PAULO - SP'));
+    // lista completa do Brasil: 109 filiais + 5.571 municípios + valores livres
+    assert.ok(cidades.length > 5600);
     // ordem: toda filial vem antes de qualquer município
     const ultimaFilial = Math.max(
       ...cidades.map((c: string, i: number) => (/^\d+ - /.test(c) ? i : -1))
     );
-    const primeiroMunicipio = cidades.indexOf('AGUA DOCE - SC');
+    const primeiroMunicipio = cidades.indexOf('ABADIA DE GOIÁS - GO');
     assert.ok(ultimaFilial < primeiroMunicipio);
     // valores livres digitados nos fretes continuam disponíveis, ao final
     assert.ok(cidades.indexOf('Concórdia') > primeiroMunicipio);

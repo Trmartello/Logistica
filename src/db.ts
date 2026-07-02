@@ -79,14 +79,26 @@ function migrarValorOpcional(db: DatabaseSync): void {
   }
 }
 
-/** Cadastra os locais fixos (filiais e municípios-UF) na primeira execução. */
+/**
+ * Cadastra os locais fixos (filiais e municípios-UF). A tabela é somente de
+ * referência: se a quantidade gravada divergir das listas do código (ex.:
+ * banco semeado com uma versão anterior), ela é reconstruída.
+ */
 function semearLocais(db: DatabaseSync): void {
-  const existentes = db.prepare('SELECT COUNT(*) AS total FROM locais').get() as { total: number };
-  if (existentes.total > 0) return;
+  const contagem = db
+    .prepare(
+      `SELECT
+         SUM(CASE tipo WHEN 'FILIAL' THEN 1 ELSE 0 END) AS filiais,
+         SUM(CASE tipo WHEN 'MUNICIPIO' THEN 1 ELSE 0 END) AS municipios
+       FROM locais`
+    )
+    .get() as { filiais: number | null; municipios: number | null };
+  if (contagem.filiais === FILIAIS.length && contagem.municipios === MUNICIPIOS.length) return;
 
   const insere = db.prepare('INSERT INTO locais (nome, tipo, ordem) VALUES (?, ?, ?)');
   db.exec('BEGIN');
   try {
+    db.exec('DELETE FROM locais');
     FILIAIS.forEach((nome, indice) => insere.run(nome, 'FILIAL', indice));
     MUNICIPIOS.forEach((nome, indice) => insere.run(nome, 'MUNICIPIO', indice));
     db.exec('COMMIT');
