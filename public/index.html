@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logística — Painel de Entregas</title>
+  <style>
+    :root {
+      --fundo: #f4f5f7; --superficie: #ffffff; --borda: #e0e2e8;
+      --texto: #1e2430; --texto-suave: #6a7181; --primaria: #1f5fbf;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, sans-serif;
+      background: var(--fundo); color: var(--texto);
+    }
+    header {
+      background: var(--superficie); border-bottom: 1px solid var(--borda);
+      padding: 16px 24px; display: flex; align-items: center; gap: 12px;
+    }
+    header h1 { font-size: 18px; margin: 0; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    section { background: var(--superficie); border: 1px solid var(--borda); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+    h2 { font-size: 15px; margin: 0 0 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--borda); }
+    th { color: var(--texto-suave); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .tabela-scroll { overflow-x: auto; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .badge.PENDENTE   { background: #fdf1d8; color: #7a5a00; }
+    .badge.COLETADA   { background: #e3ecfb; color: #1f4e96; }
+    .badge.EM_TRANSITO{ background: #e7e3fb; color: #4a3a96; }
+    .badge.ENTREGUE   { background: #ddf2e4; color: #1a6b3c; }
+    .badge.CANCELADA  { background: #fbe3e3; color: #96261f; }
+    form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--texto-suave); font-weight: 600; }
+    input, select, button {
+      padding: 8px 10px; border: 1px solid var(--borda); border-radius: 6px;
+      font-size: 14px; font-family: inherit; background: var(--superficie); color: var(--texto);
+    }
+    button { background: var(--primaria); color: #fff; border: none; cursor: pointer; font-weight: 600; }
+    button:hover { filter: brightness(1.1); }
+    button.acao { background: transparent; color: var(--primaria); border: 1px solid var(--primaria); padding: 4px 10px; font-size: 12px; }
+    .filtros { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .filtros button { background: transparent; color: var(--texto-suave); border: 1px solid var(--borda); font-size: 13px; }
+    .filtros button.ativo { background: var(--primaria); color: #fff; border-color: var(--primaria); }
+    .vazio { color: var(--texto-suave); padding: 24px; text-align: center; }
+    #mensagem { margin-top: 12px; font-size: 13px; }
+    #mensagem.erro { color: #96261f; }
+    #mensagem.ok { color: #1a6b3c; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📦 Logística — Painel de Entregas</h1>
+  </header>
+  <main>
+    <section>
+      <h2>Nova entrega</h2>
+      <form id="form-entrega">
+        <label>Cliente*
+          <select name="cliente_id" required></select>
+        </label>
+        <label>Motorista
+          <select name="motorista_id"><option value="">—</option></select>
+        </label>
+        <label>Veículo
+          <select name="veiculo_id"><option value="">—</option></select>
+        </label>
+        <label>Origem*
+          <input name="origem" required placeholder="Cidade/UF">
+        </label>
+        <label>Destino*
+          <input name="destino" required placeholder="Cidade/UF">
+        </label>
+        <label>Peso (kg)
+          <input name="peso_kg" type="number" step="0.1" min="0">
+        </label>
+        <label>&nbsp;
+          <button type="submit">Registrar entrega</button>
+        </label>
+      </form>
+      <div id="mensagem"></div>
+    </section>
+
+    <section>
+      <h2>Entregas</h2>
+      <div class="filtros" id="filtros"></div>
+      <div class="tabela-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th><th>Cliente</th><th>Origem</th><th>Destino</th>
+              <th>Motorista</th><th>Veículo</th><th>Status</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="lista-entregas"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const STATUS = ['', 'PENDENTE', 'COLETADA', 'EM_TRANSITO', 'ENTREGUE', 'CANCELADA'];
+    const PROXIMO = { PENDENTE: 'COLETADA', COLETADA: 'EM_TRANSITO', EM_TRANSITO: 'ENTREGUE' };
+    let filtroAtual = '';
+
+    async function api(caminho, opcoes) {
+      const resp = await fetch(caminho, opcoes);
+      const dados = await resp.json().catch(() => null);
+      if (!resp.ok) throw new Error(dados?.erro || 'Erro na requisição');
+      return dados;
+    }
+
+    function mostrarMensagem(texto, tipo) {
+      const el = document.getElementById('mensagem');
+      el.textContent = texto;
+      el.className = tipo;
+    }
+
+    async function carregarSelecoes() {
+      const [clientes, motoristas, veiculos] = await Promise.all([
+        api('/api/clientes'), api('/api/motoristas'), api('/api/veiculos'),
+      ]);
+      const form = document.getElementById('form-entrega');
+      form.cliente_id.innerHTML = clientes
+        .map((c) => `<option value="${c.id}">${c.nome}</option>`).join('');
+      form.motorista_id.innerHTML = '<option value="">—</option>' + motoristas
+        .map((m) => `<option value="${m.id}">${m.nome}</option>`).join('');
+      form.veiculo_id.innerHTML = '<option value="">—</option>' + veiculos
+        .map((v) => `<option value="${v.id}">${v.placa} — ${v.modelo ?? ''}</option>`).join('');
+    }
+
+    function desenharFiltros() {
+      document.getElementById('filtros').innerHTML = STATUS
+        .map((s) => `<button data-status="${s}" class="${s === filtroAtual ? 'ativo' : ''}">${s || 'Todas'}</button>`)
+        .join('');
+    }
+
+    async function carregarEntregas() {
+      const query = filtroAtual ? `?status=${filtroAtual}` : '';
+      const entregas = await api('/api/entregas' + query);
+      const corpo = document.getElementById('lista-entregas');
+      if (entregas.length === 0) {
+        corpo.innerHTML = '<tr><td colspan="8" class="vazio">Nenhuma entrega encontrada</td></tr>';
+        return;
+      }
+      corpo.innerHTML = entregas.map((e) => `
+        <tr>
+          <td><strong>${e.codigo}</strong></td>
+          <td>${e.cliente_nome}</td>
+          <td>${e.origem}</td>
+          <td>${e.destino}</td>
+          <td>${e.motorista_nome ?? '—'}</td>
+          <td>${e.veiculo_placa ?? '—'}</td>
+          <td><span class="badge ${e.status}">${e.status.replace('_', ' ')}</span></td>
+          <td>
+            ${PROXIMO[e.status] ? `<button class="acao" data-id="${e.id}" data-proximo="${PROXIMO[e.status]}">→ ${PROXIMO[e.status].replace('_', ' ')}</button>` : ''}
+          </td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('filtros').addEventListener('click', (ev) => {
+      const botao = ev.target.closest('button[data-status]');
+      if (!botao) return;
+      filtroAtual = botao.dataset.status;
+      desenharFiltros();
+      carregarEntregas();
+    });
+
+    document.getElementById('lista-entregas').addEventListener('click', async (ev) => {
+      const botao = ev.target.closest('button[data-id]');
+      if (!botao) return;
+      try {
+        await api(`/api/entregas/${botao.dataset.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: botao.dataset.proximo }),
+        });
+        carregarEntregas();
+      } catch (erro) {
+        alert(erro.message);
+      }
+    });
+
+    document.getElementById('form-entrega').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const form = ev.target;
+      const dados = Object.fromEntries(new FormData(form).entries());
+      for (const chave of ['motorista_id', 'veiculo_id', 'peso_kg']) {
+        if (dados[chave] === '') delete dados[chave];
+      }
+      try {
+        const criada = await api('/api/entregas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dados),
+        });
+        mostrarMensagem(`Entrega ${criada.codigo} registrada com sucesso.`, 'ok');
+        form.reset();
+        carregarEntregas();
+      } catch (erro) {
+        mostrarMensagem(erro.message, 'erro');
+      }
+    });
+
+    desenharFiltros();
+    carregarSelecoes().catch(() => mostrarMensagem('Erro ao carregar cadastros', 'erro'));
+    carregarEntregas().catch(() => {});
+  </script>
+</body>
+</html>
