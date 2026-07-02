@@ -18,7 +18,7 @@
     }
     header {
       background: var(--superficie); border-bottom: 1px solid var(--borda);
-      padding: 12px 16px; position: sticky; top: 0; z-index: 10;
+      padding: 10px 16px; position: sticky; top: 0; z-index: 10;
       display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between;
     }
     header h1 { font-size: 17px; margin: 0; }
@@ -29,10 +29,10 @@
       background: var(--fundo); border-radius: 999px; padding: 9px 16px;
     }
     /* ---- KPIs ---- */
-    .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
     .kpi {
       background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px;
-      padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0;
+      padding: 10px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0;
     }
     .kpi-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .kpi-rotulo { font-size: 13px; font-weight: 600; color: var(--texto); }
@@ -49,7 +49,7 @@
     .kpi-delta .desce { color: var(--perigo); font-weight: 700; }
     .kpi-delta .atencao { color: var(--alerta); font-weight: 700; }
     /* ---- Chips de filtro rápido ---- */
-    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
     .chips button {
       width: auto; min-height: 36px; padding: 6px 14px; border-radius: 999px;
       background: transparent; border: 1px solid var(--borda); color: var(--texto-suave);
@@ -57,12 +57,12 @@
     }
     .chips button.ativo { background: #e2f2e7; border-color: var(--primaria); color: var(--primaria); }
     .chips button.chip-alerta.ativo { background: var(--alerta-fundo); border-color: var(--alerta); color: var(--alerta); }
-    main { width: 100%; margin: 0 auto; padding: 16px; }
+    main { width: 100%; margin: 0 auto; padding: 12px; }
     section {
       background: var(--superficie); border: 1px solid var(--borda);
-      border-radius: 10px; padding: 16px; margin-bottom: 16px;
+      border-radius: 10px; padding: 12px; margin-bottom: 12px;
     }
-    h2 { font-size: 15px; margin: 0 0 14px; }
+    h2 { font-size: 15px; margin: 0 0 12px; }
 
     /* ---- Modal de cadastro ---- */
     dialog {
@@ -81,9 +81,9 @@
       width: 38px; min-height: 38px; padding: 0; font-size: 16px;
       background: transparent; color: var(--texto-suave); border: none;
     }
-    .modal-corpo { padding: 18px; }
+    .modal-corpo { padding: 14px 16px; }
     input[readonly] { background: #f0f2f5; color: var(--texto-suave); }
-    .topo-lista { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .topo-lista { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
     .topo-lista h2 { margin: 0; }
     .topo-acoes { display: flex; gap: 8px; width: 100%; }
     .topo-acoes button { flex: 1; width: auto; min-width: 0; padding: 8px 10px; font-size: 13px; white-space: nowrap; }
@@ -121,7 +121,7 @@
     #mensagem-global:not(:empty) { margin-bottom: 10px; }
 
     /* ---- Formulário: 1 coluna no celular, grade no desktop ---- */
-    .grade { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .grade { display: grid; grid-template-columns: 1fr; gap: 10px; }
     label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--texto-suave); font-weight: 600; }
     input, select, button {
       padding: 12px; border: 1px solid var(--borda); border-radius: 8px;
@@ -144,10 +144,18 @@
     #mensagem.ok { color: #1a6b3c; }
 
     /* ---- Filtros ---- */
-    .filtros { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .filtros { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
     .filtros .largura-toda { grid-column: 1 / -1; }
-    .resumo { font-size: 14px; color: var(--texto-suave); margin-bottom: 10px; }
-    .resumo strong { color: var(--texto); }
+    .resumo-kpis { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .mini-kpi {
+      border: 1px solid var(--borda); border-radius: 8px; padding: 5px 12px;
+      display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 100px;
+      background: var(--fundo);
+    }
+    .mini-kpi-rotulo { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--texto-suave); }
+    .mini-kpi-valor { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .mini-kpi.alerta { background: var(--alerta-fundo); border-color: var(--alerta-borda); }
+    .mini-kpi.alerta .mini-kpi-valor, .mini-kpi.alerta .mini-kpi-rotulo { color: var(--alerta); }
 
     /* ---- Lista: cartões no celular ---- */
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -188,22 +196,24 @@
     /* ---- Desktop (≥ 800px): tela inteira, formulário em grade e lista em tabela ---- */
     @media (min-width: 800px) {
       header h1 { font-size: 18px; }
-      main { padding: 24px 32px; }
+      main { padding: 14px 18px; }
+      section { padding: 14px 16px; }
       .topo-acoes { width: auto; }
       .topo-acoes button { flex: none; font-size: 14px; padding: 9px 14px; }
       .grade { grid-template-columns: repeat(4, 1fr); }
       .acoes-form { flex-direction: row; align-items: center; }
       .acoes-form button { width: auto; min-width: 160px; }
       .filtros { grid-template-columns: 1fr 1fr auto; align-items: end; max-width: 640px; }
-      .kpis { grid-template-columns: repeat(4, 1fr); gap: 16px; }
-      .kpi-valor { font-size: 34px; }
+      .kpis { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+      .kpi-valor { font-size: 28px; }
+      .mini-kpi { flex: none; min-width: 150px; }
       .filtros .largura-toda { grid-column: auto; }
       input, select, button { font-size: 14px; padding: 9px 10px; min-height: 40px; }
       table { border: none; }
       thead { display: table-header-group; }
-      thead th { text-align: left; padding: 8px 10px; color: var(--texto-suave); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--borda); white-space: nowrap; }
+      thead th { text-align: left; padding: 7px 8px; color: var(--texto-suave); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--borda); white-space: nowrap; }
       tr.frete { display: table-row; border: none; padding: 0; }
-      td { display: table-cell; padding: 9px 10px; border-bottom: 1px solid var(--borda); white-space: nowrap; vertical-align: middle; }
+      td { display: table-cell; padding: 6px 8px; border-bottom: 1px solid var(--borda); white-space: nowrap; vertical-align: middle; }
       td::before { content: none; }
       td.celula-acoes { border-top: none; margin: 0; }
       .acao-icone { width: 30px; min-width: 30px; min-height: 28px; font-size: 13px; border-radius: 6px; }
@@ -325,7 +335,20 @@
         </label>
         <button type="button" class="secundario largura-toda" id="limpar-filtros">Limpar filtros</button>
       </div>
-      <div class="resumo" id="resumo"></div>
+      <div class="resumo-kpis" id="resumo">
+        <div class="mini-kpi">
+          <span class="mini-kpi-rotulo">Fretes</span>
+          <span class="mini-kpi-valor" id="resumo-fretes">—</span>
+        </div>
+        <div class="mini-kpi">
+          <span class="mini-kpi-rotulo">Total</span>
+          <span class="mini-kpi-valor" id="resumo-total">—</span>
+        </div>
+        <div class="mini-kpi alerta" id="resumo-pendentes-cartao" hidden>
+          <span class="mini-kpi-rotulo">Sem valor</span>
+          <span class="mini-kpi-valor" id="resumo-pendentes">0</span>
+        </div>
+      </div>
       <div class="tabela-scroll">
         <table>
           <thead>
@@ -631,9 +654,11 @@
       const corpo = document.getElementById('lista-fretes');
       const soma = fretesAtuais.reduce((total, f) => total + (f.frete_total ?? 0), 0);
       const pendentesNoFiltro = fretesAtuais.filter((f) => f.pendente_valor).length;
-      document.getElementById('resumo').innerHTML =
-        `<strong>${fretesAtuais.length}</strong> frete(s) — total <strong>${fmtBRL.format(soma)}</strong>` +
-        (pendentesNoFiltro > 0 ? ` — <strong style="color:#7a5a00">${pendentesNoFiltro} sem valor</strong>` : '');
+      document.getElementById('resumo-fretes').textContent =
+        new Intl.NumberFormat('pt-BR').format(fretesAtuais.length);
+      document.getElementById('resumo-total').textContent = fmtBRL.format(soma);
+      document.getElementById('resumo-pendentes').textContent = pendentesNoFiltro;
+      document.getElementById('resumo-pendentes-cartao').hidden = pendentesNoFiltro === 0;
 
       desenharTabela();
     }
