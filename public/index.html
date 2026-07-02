@@ -19,7 +19,7 @@
       padding: 14px 16px; position: sticky; top: 0; z-index: 10;
     }
     header h1 { font-size: 17px; margin: 0; }
-    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    main { width: 100%; margin: 0 auto; padding: 16px; }
     section {
       background: var(--superficie); border: 1px solid var(--borda);
       border-radius: 10px; padding: 16px; margin-bottom: 16px;
@@ -47,7 +47,17 @@
     input[readonly] { background: #f0f2f5; color: var(--texto-suave); }
     .topo-lista { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
     .topo-lista h2 { margin: 0; }
-    #botao-novo { width: auto; min-width: 150px; }
+    .topo-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+    #botao-novo, #botao-colunas { width: auto; min-width: 130px; }
+    th.ordenavel { cursor: pointer; user-select: none; }
+    th.ordenavel:hover { color: var(--primaria); }
+    th .seta { font-size: 10px; margin-left: 3px; }
+    #modal-colunas { width: min(440px, calc(100% - 24px)); }
+    .lista-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; padding-bottom: 14px; }
+    .lista-colunas label { flex-direction: row; align-items: center; gap: 8px; font-weight: 500; color: var(--texto); font-size: 14px; }
+    .lista-colunas input[type="checkbox"] { width: auto; min-height: 0; accent-color: var(--primaria); }
+    .ordenacao-config { display: flex; gap: 12px; border-top: 1px solid var(--borda); padding-top: 14px; }
+    .ordenacao-config label { flex: 1; }
     #mensagem-global { font-size: 14px; color: #1a6b3c; min-height: 0; }
     #mensagem-global:not(:empty) { margin-bottom: 10px; }
 
@@ -109,9 +119,10 @@
     .notas-celula { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
     .vazio { color: var(--texto-suave); padding: 24px; text-align: center; display: block; }
 
-    /* ---- Desktop (≥ 800px): formulário em grade e lista em tabela ---- */
+    /* ---- Desktop (≥ 800px): tela inteira, formulário em grade e lista em tabela ---- */
     @media (min-width: 800px) {
       header h1 { font-size: 18px; }
+      main { padding: 24px 32px; }
       .grade { grid-template-columns: repeat(4, 1fr); }
       .acoes-form { flex-direction: row; align-items: center; }
       .acoes-form button { width: auto; min-width: 160px; }
@@ -193,7 +204,10 @@
     <section>
       <div class="topo-lista">
         <h2>Fretes cadastrados</h2>
-        <button type="button" id="botao-novo">+ Novo frete</button>
+        <div class="topo-acoes">
+          <button type="button" class="secundario" id="botao-colunas" title="Escolher colunas e ordenação">⚙️ Colunas</button>
+          <button type="button" id="botao-novo">+ Novo frete</button>
+        </div>
       </div>
       <div id="mensagem-global"></div>
       <div class="filtros">
@@ -213,17 +227,33 @@
       <div class="tabela-scroll">
         <table>
           <thead>
-            <tr>
-              <th>Data</th><th>Motorista</th><th>Placa / CC</th><th>Origem</th><th>Destino</th>
-              <th>Notas</th><th class="num">Peso (t)</th><th class="num">R$/t</th>
-              <th class="num">Frete total</th><th class="num">R$ / nota</th>
-              <th>Registrado em</th><th></th>
-            </tr>
+            <tr id="linha-cabecalho"></tr>
           </thead>
           <tbody id="lista-fretes"></tbody>
         </table>
       </div>
     </section>
+
+    <dialog id="modal-colunas">
+      <div class="modal-cabecalho">
+        <h2>Colunas e ordenação</h2>
+        <button type="button" class="fechar-modal" id="fechar-colunas" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-corpo">
+        <div class="lista-colunas" id="lista-colunas"></div>
+        <div class="ordenacao-config">
+          <label>Ordenar por
+            <select id="ordenar-coluna"></select>
+          </label>
+          <label>Direção
+            <select id="ordenar-direcao">
+              <option value="asc">Crescente ↑</option>
+              <option value="desc">Decrescente ↓</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </dialog>
   </main>
 
   <script>
@@ -235,6 +265,59 @@
     let fretesAtuais = [];
     let somentePendentes = false;
     const dinheiro = (v) => (v != null ? fmtBRL.format(v) : '—');
+
+    // --- Colunas da lista: visibilidade e ordenação configuráveis ---
+    const COLUNAS = [
+      { chave: 'data', rotulo: 'Data', desenhar: (f) => dataBR(f.data) },
+      { chave: 'motorista', rotulo: 'Motorista', desenhar: (f) => f.motorista },
+      { chave: 'placa_cc', rotulo: 'Placa / CC', desenhar: (f) => f.placa_cc ?? '—' },
+      { chave: 'origem', rotulo: 'Origem', desenhar: (f) => f.origem },
+      { chave: 'destino', rotulo: 'Destino', desenhar: (f) => f.destino },
+      {
+        chave: 'notas', rotulo: 'Notas', classe: 'notas-celula',
+        desenhar: (f) => f.notas.length ? f.notas.map((n) => `<span class="badge-nota">${n}</span>`).join('') : '—',
+        valorOrdenacao: (f) => f.notas[0] ?? null,
+      },
+      { chave: 'peso_ton', rotulo: 'Peso (t)', num: true, desenhar: (f) => (f.peso_ton != null ? fmtNum.format(f.peso_ton) : '—') },
+      { chave: 'valor_ton', rotulo: 'R$/t', num: true, desenhar: (f) => dinheiro(f.valor_ton) },
+      {
+        chave: 'frete_total', rotulo: 'Frete total', num: true, classe: 'destaque',
+        desenhar: (f) => f.pendente_valor ? '<span class="badge-pendente">SEM VALOR</span>' : dinheiro(f.frete_total),
+      },
+      { chave: 'valor_por_nota', rotulo: 'R$ / nota', num: true, desenhar: (f) => dinheiro(f.valor_por_nota) },
+      { chave: 'criado_em', rotulo: 'Registrado em', desenhar: (f) => dataHoraBR(f.criado_em) },
+    ];
+    const CHAVE_PREFS = 'fretes-prefs-v1';
+    const prefs = (() => {
+      const padrao = { visiveis: COLUNAS.map((c) => c.chave), ordenacao: { chave: 'data', direcao: 'desc' } };
+      try {
+        const salvo = JSON.parse(localStorage.getItem(CHAVE_PREFS));
+        if (salvo && Array.isArray(salvo.visiveis) && salvo.ordenacao) {
+          salvo.visiveis = salvo.visiveis.filter((v) => COLUNAS.some((c) => c.chave === v));
+          if (!COLUNAS.some((c) => c.chave === salvo.ordenacao.chave)) salvo.ordenacao = padrao.ordenacao;
+          return salvo;
+        }
+      } catch (_) {}
+      return padrao;
+    })();
+    function salvarPrefs() {
+      try { localStorage.setItem(CHAVE_PREFS, JSON.stringify(prefs)); } catch (_) {}
+    }
+    const colunasVisiveis = () => COLUNAS.filter((c) => prefs.visiveis.includes(c.chave));
+
+    function compararFretes(a, b) {
+      const coluna = COLUNAS.find((c) => c.chave === prefs.ordenacao.chave) ?? COLUNAS[0];
+      const pegar = coluna.valorOrdenacao ?? ((f) => f[coluna.chave]);
+      const va = pegar(a), vb = pegar(b);
+      if (va == null && vb == null) return b.id - a.id;
+      if (va == null) return 1;   // vazios sempre ao final
+      if (vb == null) return -1;
+      let resultado;
+      if (typeof va === 'number' && typeof vb === 'number') resultado = va - vb;
+      else resultado = String(va).localeCompare(String(vb), 'pt-BR', { numeric: true });
+      if (prefs.ordenacao.direcao === 'desc') resultado = -resultado;
+      return resultado || b.id - a.id;
+    }
 
     async function api(caminho, opcoes) {
       const resp = await fetch(caminho, opcoes);
@@ -421,29 +504,82 @@
         `<strong>${fretesAtuais.length}</strong> frete(s) — total <strong>${fmtBRL.format(soma)}</strong>` +
         (pendentesNoFiltro > 0 ? ` — <strong style="color:#7a5a00">${pendentesNoFiltro} sem valor</strong>` : '');
 
+      desenharTabela();
+    }
+
+    function desenharTabela() {
+      const visiveis = colunasVisiveis();
+      const { chave, direcao } = prefs.ordenacao;
+      document.getElementById('linha-cabecalho').innerHTML = visiveis.map((c) => `
+        <th class="ordenavel${c.num ? ' num' : ''}" data-ordenar="${c.chave}">
+          ${c.rotulo}<span class="seta">${c.chave === chave ? (direcao === 'asc' ? '▲' : '▼') : '↕'}</span>
+        </th>`).join('') + '<th></th>';
+
+      const corpo = document.getElementById('lista-fretes');
       if (fretesAtuais.length === 0) {
-        corpo.innerHTML = '<tr><td colspan="12" class="vazio sem-rotulo">Nenhum frete encontrado</td></tr>';
+        corpo.innerHTML = `<tr><td colspan="${visiveis.length + 1}" class="vazio sem-rotulo">Nenhum frete encontrado</td></tr>`;
         return;
       }
-      corpo.innerHTML = fretesAtuais.map((f) => `
+      const ordenados = [...fretesAtuais].sort(compararFretes);
+      corpo.innerHTML = ordenados.map((f) => `
         <tr class="frete${f.pendente_valor ? ' pendente' : ''}">
-          <td data-rotulo="Data">${dataBR(f.data)}</td>
-          <td data-rotulo="Motorista">${f.motorista}</td>
-          <td data-rotulo="Placa / CC">${f.placa_cc ?? '—'}</td>
-          <td data-rotulo="Origem">${f.origem}</td>
-          <td data-rotulo="Destino">${f.destino}</td>
-          <td data-rotulo="Notas" class="notas-celula">${f.notas.length ? f.notas.map((n) => `<span class="badge-nota">${n}</span>`).join('') : '—'}</td>
-          <td data-rotulo="Peso (t)" class="num">${f.peso_ton != null ? fmtNum.format(f.peso_ton) : '—'}</td>
-          <td data-rotulo="R$/t" class="num">${dinheiro(f.valor_ton)}</td>
-          <td data-rotulo="Frete total" class="num destaque">${f.pendente_valor ? '<span class="badge-pendente">SEM VALOR</span>' : dinheiro(f.frete_total)}</td>
-          <td data-rotulo="R$ / nota" class="num">${dinheiro(f.valor_por_nota)}</td>
-          <td data-rotulo="Registrado em">${dataHoraBR(f.criado_em)}</td>
+          ${visiveis.map((c) => `<td data-rotulo="${c.rotulo}" class="${c.num ? 'num ' : ''}${c.classe ?? ''}">${c.desenhar(f)}</td>`).join('')}
           <td class="celula-acoes sem-rotulo">
             <button type="button" class="${f.pendente_valor ? 'lancar' : 'secundario'}" data-editar="${f.id}">${f.pendente_valor ? 'Lançar valor' : 'Editar'}</button>
             <button type="button" class="excluir" data-excluir="${f.id}">Excluir</button>
           </td>
         </tr>`).join('');
     }
+
+    // Clique no cabeçalho: alterna crescente/decrescente
+    document.getElementById('linha-cabecalho').addEventListener('click', (ev) => {
+      const th = ev.target.closest('th[data-ordenar]');
+      if (!th) return;
+      const chave = th.dataset.ordenar;
+      if (prefs.ordenacao.chave === chave) {
+        prefs.ordenacao.direcao = prefs.ordenacao.direcao === 'asc' ? 'desc' : 'asc';
+      } else {
+        prefs.ordenacao = { chave, direcao: 'asc' };
+      }
+      salvarPrefs();
+      sincronizarPainelColunas();
+      desenharTabela();
+    });
+
+    // --- Painel ⚙️ de colunas e ordenação ---
+    const modalColunas = document.getElementById('modal-colunas');
+    function sincronizarPainelColunas() {
+      document.getElementById('lista-colunas').innerHTML = COLUNAS.map((c) => `
+        <label><input type="checkbox" value="${c.chave}" ${prefs.visiveis.includes(c.chave) ? 'checked' : ''}> ${c.rotulo}</label>`).join('');
+      document.getElementById('ordenar-coluna').innerHTML = COLUNAS
+        .map((c) => `<option value="${c.chave}" ${c.chave === prefs.ordenacao.chave ? 'selected' : ''}>${c.rotulo}</option>`).join('');
+      document.getElementById('ordenar-direcao').value = prefs.ordenacao.direcao;
+    }
+    document.getElementById('botao-colunas').addEventListener('click', () => {
+      sincronizarPainelColunas();
+      modalColunas.showModal();
+    });
+    document.getElementById('fechar-colunas').addEventListener('click', () => modalColunas.close());
+    modalColunas.addEventListener('click', (ev) => {
+      if (ev.target === modalColunas) modalColunas.close();
+    });
+    document.getElementById('lista-colunas').addEventListener('change', () => {
+      const marcadas = [...document.querySelectorAll('#lista-colunas input:checked')].map((c) => c.value);
+      if (marcadas.length === 0) { sincronizarPainelColunas(); return; } // ao menos 1 coluna
+      prefs.visiveis = COLUNAS.map((c) => c.chave).filter((c) => marcadas.includes(c));
+      salvarPrefs();
+      desenharTabela();
+    });
+    document.getElementById('ordenar-coluna').addEventListener('change', (ev) => {
+      prefs.ordenacao.chave = ev.target.value;
+      salvarPrefs();
+      desenharTabela();
+    });
+    document.getElementById('ordenar-direcao').addEventListener('change', (ev) => {
+      prefs.ordenacao.direcao = ev.target.value;
+      salvarPrefs();
+      desenharTabela();
+    });
 
     document.getElementById('lista-fretes').addEventListener('click', async (ev) => {
       const editar = ev.target.closest('button[data-editar]');
