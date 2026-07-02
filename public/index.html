@@ -87,9 +87,22 @@
     .topo-lista h2 { margin: 0; }
     .topo-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
     #botao-novo, #botao-colunas { width: auto; min-width: 130px; }
-    th.ordenavel { cursor: pointer; user-select: none; }
+    th.ordenavel { cursor: pointer; user-select: none; position: relative; }
     th.ordenavel:hover { color: var(--primaria); }
     th .seta { font-size: 10px; margin-left: 3px; }
+    .alca-redimensionar {
+      position: absolute; top: 0; right: -4px; bottom: 0; width: 9px;
+      cursor: col-resize; z-index: 1;
+    }
+    .alca-redimensionar::after {
+      content: ''; position: absolute; top: 20%; bottom: 20%; right: 4px;
+      width: 1px; background: var(--borda);
+    }
+    .alca-redimensionar:hover::after, .alca-redimensionar.arrastando::after {
+      width: 3px; right: 3px; background: var(--primaria);
+    }
+    table.larguras-fixas { table-layout: fixed; }
+    table.larguras-fixas td, table.larguras-fixas th { overflow: hidden; text-overflow: ellipsis; }
     #modal-colunas { width: min(440px, calc(100% - 24px)); }
     .lista-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; padding-bottom: 14px; }
     .lista-colunas label { flex-direction: row; align-items: center; gap: 8px; font-weight: 500; color: var(--texto); font-size: 14px; }
@@ -321,6 +334,9 @@
             </select>
           </label>
         </div>
+        <div class="ordenacao-config">
+          <button type="button" class="secundario" id="restaurar-larguras">Restaurar larguras das colunas</button>
+        </div>
       </div>
     </dialog>
   </main>
@@ -358,12 +374,13 @@
     ];
     const CHAVE_PREFS = 'fretes-prefs-v1';
     const prefs = (() => {
-      const padrao = { visiveis: COLUNAS.map((c) => c.chave), ordenacao: { chave: 'data', direcao: 'desc' } };
+      const padrao = { visiveis: COLUNAS.map((c) => c.chave), ordenacao: { chave: 'data', direcao: 'desc' }, larguras: {} };
       try {
         const salvo = JSON.parse(localStorage.getItem(CHAVE_PREFS));
         if (salvo && Array.isArray(salvo.visiveis) && salvo.ordenacao) {
           salvo.visiveis = salvo.visiveis.filter((v) => COLUNAS.some((c) => c.chave === v));
           if (!COLUNAS.some((c) => c.chave === salvo.ordenacao.chave)) salvo.ordenacao = padrao.ordenacao;
+          salvo.larguras = salvo.larguras && typeof salvo.larguras === 'object' ? salvo.larguras : {};
           return salvo;
         }
       } catch (_) {}
@@ -579,9 +596,13 @@
     function desenharTabela() {
       const visiveis = colunasVisiveis();
       const { chave, direcao } = prefs.ordenacao;
+      const temLarguras = Object.keys(prefs.larguras).length > 0;
+      document.querySelector('table').classList.toggle('larguras-fixas', temLarguras);
       document.getElementById('linha-cabecalho').innerHTML = visiveis.map((c) => `
-        <th class="ordenavel${c.num ? ' num' : ''}" data-ordenar="${c.chave}">
+        <th class="ordenavel${c.num ? ' num' : ''}" data-ordenar="${c.chave}"
+            ${prefs.larguras[c.chave] ? `style="width:${prefs.larguras[c.chave]}px"` : ''}>
           ${c.rotulo}<span class="seta">${c.chave === chave ? (direcao === 'asc' ? '▲' : '▼') : '↕'}</span>
+          <span class="alca-redimensionar" data-redimensionar="${c.chave}"></span>
         </th>`).join('') + '<th></th>';
 
       const corpo = document.getElementById('lista-fretes');
@@ -600,8 +621,43 @@
         </tr>`).join('');
     }
 
+    // Arraste na borda do cabeçalho: redimensiona a coluna
+    document.getElementById('linha-cabecalho').addEventListener('pointerdown', (ev) => {
+      const alca = ev.target.closest('.alca-redimensionar');
+      if (!alca) return;
+      ev.preventDefault();
+      const chave = alca.dataset.redimensionar;
+      const th = alca.closest('th');
+      const tabela = document.querySelector('table');
+
+      // Congela as larguras atuais para o arraste não deslocar as demais colunas
+      document.querySelectorAll('#linha-cabecalho th[data-ordenar]').forEach((el) => {
+        prefs.larguras[el.dataset.ordenar] = Math.round(el.getBoundingClientRect().width);
+        el.style.width = `${prefs.larguras[el.dataset.ordenar]}px`;
+      });
+      tabela.classList.add('larguras-fixas');
+      alca.classList.add('arrastando');
+      alca.setPointerCapture(ev.pointerId);
+
+      const xInicial = ev.clientX;
+      const larguraInicial = prefs.larguras[chave];
+      const aoMover = (evMover) => {
+        prefs.larguras[chave] = Math.max(56, Math.round(larguraInicial + evMover.clientX - xInicial));
+        th.style.width = `${prefs.larguras[chave]}px`;
+      };
+      const aoSoltar = () => {
+        alca.classList.remove('arrastando');
+        alca.removeEventListener('pointermove', aoMover);
+        alca.removeEventListener('pointerup', aoSoltar);
+        salvarPrefs();
+      };
+      alca.addEventListener('pointermove', aoMover);
+      alca.addEventListener('pointerup', aoSoltar);
+    });
+
     // Clique no cabeçalho: alterna crescente/decrescente
     document.getElementById('linha-cabecalho').addEventListener('click', (ev) => {
+      if (ev.target.closest('.alca-redimensionar')) return;
       const th = ev.target.closest('th[data-ordenar]');
       if (!th) return;
       const chave = th.dataset.ordenar;
@@ -646,6 +702,11 @@
     });
     document.getElementById('ordenar-direcao').addEventListener('change', (ev) => {
       prefs.ordenacao.direcao = ev.target.value;
+      salvarPrefs();
+      desenharTabela();
+    });
+    document.getElementById('restaurar-larguras').addEventListener('click', () => {
+      prefs.larguras = {};
       salvarPrefs();
       desenharTabela();
     });
