@@ -6,8 +6,10 @@
   <title>Controle de Fretes</title>
   <style>
     :root {
-      --fundo: #f4f5f7; --superficie: #ffffff; --borda: #e0e2e8;
-      --texto: #1e2430; --texto-suave: #6a7181; --primaria: #1f5fbf; --perigo: #b3261e;
+      --fundo: #f3f5f1; --superficie: #ffffff; --borda: #e2e6df;
+      --texto: #18211a; --texto-suave: #5e6a60; --primaria: #166534; --perigo: #b3261e;
+      --alerta: #b45309; --alerta-fundo: #fdf1d8; --alerta-borda: #ecd9a0;
+      --bom: #1a6b3c;
     }
     * { box-sizing: border-box; }
     body {
@@ -15,10 +17,46 @@
       background: var(--fundo); color: var(--texto);
     }
     header {
-      background: var(--primaria); color: #fff;
-      padding: 14px 16px; position: sticky; top: 0; z-index: 10;
+      background: var(--superficie); border-bottom: 1px solid var(--borda);
+      padding: 12px 16px; position: sticky; top: 0; z-index: 10;
+      display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between;
     }
     header h1 { font-size: 17px; margin: 0; }
+    .cab-data { font-size: 12px; color: var(--texto-suave); margin-top: 2px; text-transform: capitalize; }
+    .cab-acoes { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 240px; justify-content: flex-end; flex-wrap: wrap; }
+    #busca-global {
+      flex: 1; min-width: 170px; max-width: 420px;
+      background: var(--fundo); border-radius: 999px; padding: 9px 16px;
+    }
+    /* ---- KPIs ---- */
+    .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .kpi {
+      background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px;
+      padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0;
+    }
+    .kpi-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .kpi-rotulo { font-size: 13px; font-weight: 600; color: var(--texto); }
+    .kpi-icone {
+      width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 15px;
+    }
+    .kpi-icone.verde { background: #e2f2e7; }
+    .kpi-icone.azul { background: #e3ecfb; }
+    .kpi-icone.ambar { background: var(--alerta-fundo); }
+    .kpi-icone.vermelho { background: #fbe3e3; }
+    .kpi-valor { font-size: 22px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+    .kpi-delta { font-size: 12px; color: var(--texto-suave); }
+    .kpi-delta .sobe { color: var(--bom); font-weight: 700; }
+    .kpi-delta .desce { color: var(--perigo); font-weight: 700; }
+    .kpi-delta .atencao { color: var(--alerta); font-weight: 700; }
+    /* ---- Chips de filtro rápido ---- */
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .chips button {
+      width: auto; min-height: 36px; padding: 6px 14px; border-radius: 999px;
+      background: transparent; border: 1px solid var(--borda); color: var(--texto-suave);
+      font-size: 13px; font-weight: 600;
+    }
+    .chips button.ativo { background: #e2f2e7; border-color: var(--primaria); color: var(--primaria); }
+    .chips button.chip-alerta.ativo { background: var(--alerta-fundo); border-color: var(--alerta); color: var(--alerta); }
     main { width: 100%; margin: 0 auto; padding: 16px; }
     section {
       background: var(--superficie); border: 1px solid var(--borda);
@@ -105,17 +143,15 @@
     td.celula-acoes button { min-height: 40px; padding: 8px; }
     td.celula-acoes .excluir { background: transparent; color: var(--perigo); border: 1px solid var(--perigo); }
     .badge-nota {
-      display: inline-block; background: #eef2fa; border: 1px solid #ccd8ef; color: #1f4e96;
+      display: inline-block; background: #e2f2e7; border: 1px solid #bfe0cb; color: #14532d;
       border-radius: 5px; padding: 2px 8px; font-size: 13px; margin: 1px 2px;
     }
     .badge-pendente {
-      display: inline-block; background: #fdf1d8; border: 1px solid #ecd9a0; color: #7a5a00;
-      border-radius: 5px; padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap;
+      display: inline-block; background: var(--alerta-fundo); border: 1px solid var(--alerta-borda); color: var(--alerta);
+      border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; white-space: nowrap;
     }
     tr.frete.pendente { border-left: 4px solid #e3a008; }
-    #filtro-pendentes { border-color: #e3a008; color: #7a5a00; background: transparent; font-weight: 700; }
-    #filtro-pendentes.ativo { background: #e3a008; color: #fff; }
-    td.celula-acoes .lancar { background: #e3a008; }
+    td.celula-acoes .lancar { background: #b45309; }
     .notas-celula { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
     .vazio { color: var(--texto-suave); padding: 24px; text-align: center; display: block; }
 
@@ -126,7 +162,9 @@
       .grade { grid-template-columns: repeat(4, 1fr); }
       .acoes-form { flex-direction: row; align-items: center; }
       .acoes-form button { width: auto; min-width: 160px; }
-      .filtros { grid-template-columns: 2fr 1fr 1fr auto auto; align-items: end; }
+      .filtros { grid-template-columns: 1fr 1fr auto; align-items: end; max-width: 640px; }
+      .kpis { grid-template-columns: repeat(4, 1fr); gap: 16px; }
+      .kpi-valor { font-size: 34px; }
       .filtros .largura-toda { grid-column: auto; }
       input, select, button { font-size: 14px; padding: 9px 10px; min-height: 40px; }
       table { border: none; }
@@ -146,7 +184,14 @@
 </head>
 <body>
   <header>
-    <h1>🚛 Controle de Fretes</h1>
+    <div>
+      <h1>🚛 Controle de Fretes</h1>
+      <div class="cab-data" id="cab-data"></div>
+    </div>
+    <div class="cab-acoes">
+      <input id="busca-global" placeholder="Buscar nota, placa, motorista, cidade...">
+      <button type="button" id="botao-novo">+ Novo frete</button>
+    </div>
   </header>
   <main>
     <dialog id="modal-frete">
@@ -201,26 +246,50 @@
       <datalist id="lista-cidades"></datalist>
     </dialog>
 
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-topo"><span class="kpi-rotulo">Fretes no mês</span><span class="kpi-icone verde">🚚</span></div>
+        <div class="kpi-valor" id="kpi-fretes">—</div>
+        <div class="kpi-delta" id="kpi-fretes-delta"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-topo"><span class="kpi-rotulo">Faturamento no mês</span><span class="kpi-icone azul">💰</span></div>
+        <div class="kpi-valor" id="kpi-faturamento">—</div>
+        <div class="kpi-delta" id="kpi-faturamento-delta"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-topo"><span class="kpi-rotulo">R$/t médio no mês</span><span class="kpi-icone ambar">⚖️</span></div>
+        <div class="kpi-valor" id="kpi-medio">—</div>
+        <div class="kpi-delta" id="kpi-medio-delta"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-topo"><span class="kpi-rotulo">Sem valor lançado</span><span class="kpi-icone vermelho">⚠️</span></div>
+        <div class="kpi-valor" id="kpi-pendentes">—</div>
+        <div class="kpi-delta" id="kpi-pendentes-delta"></div>
+      </div>
+    </div>
+
     <section>
       <div class="topo-lista">
         <h2>Fretes cadastrados</h2>
         <div class="topo-acoes">
           <button type="button" class="secundario" id="botao-colunas" title="Escolher colunas e ordenação">⚙️ Colunas</button>
-          <button type="button" id="botao-novo">+ Novo frete</button>
         </div>
       </div>
       <div id="mensagem-global"></div>
+      <div class="chips" id="chips">
+        <button type="button" data-chip="todos" class="ativo">Todos</button>
+        <button type="button" data-chip="mes-atual">Este mês</button>
+        <button type="button" data-chip="mes-anterior">Mês passado</button>
+        <button type="button" data-chip="pendentes" class="chip-alerta" id="chip-pendentes">⚠ Sem valor lançado</button>
+      </div>
       <div class="filtros">
-        <label class="largura-toda">Buscar por nota
-          <input id="filtro-nota" placeholder="nº da nota" inputmode="numeric">
-        </label>
         <label>Mês
           <input id="filtro-mes" type="month">
         </label>
         <label>Motorista
           <select id="filtro-motorista"><option value="">Todos</option></select>
         </label>
-        <button type="button" id="filtro-pendentes" class="largura-toda">⚠ Sem valor lançado</button>
         <button type="button" class="secundario largura-toda" id="limpar-filtros">Limpar filtros</button>
       </div>
       <div class="resumo" id="resumo"></div>
@@ -459,7 +528,7 @@
           : `Frete de ${dataBR(salvo.data)} ${id ? 'atualizado' : 'cadastrado'} — total ${dinheiro(salvo.frete_total)}.`;
         setTimeout(() => { global.textContent = ''; }, 6000);
         modoCadastro();
-        await Promise.all([carregarFretes(), carregarOpcoes()]);
+        await Promise.all([carregarFretes(), carregarOpcoes(), carregarResumo()]);
       } catch (erro) {
         mostrarMensagem(erro.message, 'erro');
       }
@@ -475,8 +544,8 @@
       preencher('lista-motoristas', opcoes.motoristas);
       preencher('lista-placas', opcoes.placas);
       preencher('lista-cidades', opcoes.cidades);
-      const botaoPendentes = document.getElementById('filtro-pendentes');
-      botaoPendentes.textContent = opcoes.fretes_pendentes > 0
+      const chipPendentes = document.getElementById('chip-pendentes');
+      chipPendentes.textContent = opcoes.fretes_pendentes > 0
         ? `⚠ Sem valor lançado (${opcoes.fretes_pendentes})`
         : '⚠ Sem valor lançado';
       const selecao = document.getElementById('filtro-motorista');
@@ -488,10 +557,10 @@
 
     async function carregarFretes() {
       const parametros = new URLSearchParams();
-      const nota = document.getElementById('filtro-nota').value.trim();
+      const busca = document.getElementById('busca-global').value.trim();
       const mes = document.getElementById('filtro-mes').value;
       const motorista = document.getElementById('filtro-motorista').value;
-      if (nota) parametros.set('nota', nota);
+      if (busca) parametros.set('busca', busca);
       if (mes) parametros.set('mes', mes);
       if (motorista) parametros.set('motorista', motorista);
       if (somentePendentes) parametros.set('pendentes', '1');
@@ -592,7 +661,7 @@
       if (excluir && confirm('Excluir este frete e suas notas?')) {
         try {
           await api(`/api/fretes/${excluir.dataset.excluir}`, { method: 'DELETE' });
-          carregarFretes();
+          await Promise.all([carregarFretes(), carregarOpcoes(), carregarResumo()]);
         } catch (erro) {
           alert(erro.message);
         }
@@ -600,28 +669,92 @@
     });
 
     let temporizador;
-    document.getElementById('filtro-nota').addEventListener('input', () => {
+    document.getElementById('busca-global').addEventListener('input', () => {
       clearTimeout(temporizador);
-      temporizador = setTimeout(carregarFretes, 300);
+      temporizador = setTimeout(() => { carregarFretes(); atualizarChips(); }, 300);
     });
-    document.getElementById('filtro-mes').addEventListener('change', carregarFretes);
-    document.getElementById('filtro-motorista').addEventListener('change', carregarFretes);
-    document.getElementById('filtro-pendentes').addEventListener('click', (ev) => {
-      somentePendentes = !somentePendentes;
-      ev.currentTarget.classList.toggle('ativo', somentePendentes);
+    document.getElementById('filtro-mes').addEventListener('change', () => {
       carregarFretes();
+      atualizarChips();
     });
+    document.getElementById('filtro-motorista').addEventListener('change', carregarFretes);
     document.getElementById('limpar-filtros').addEventListener('click', () => {
-      document.getElementById('filtro-nota').value = '';
+      document.getElementById('busca-global').value = '';
       document.getElementById('filtro-mes').value = '';
       document.getElementById('filtro-motorista').value = '';
       somentePendentes = false;
-      document.getElementById('filtro-pendentes').classList.remove('ativo');
+      atualizarChips();
       carregarFretes();
+    });
+
+    // --- Filtros rápidos (chips) ---
+    const mesISO = (deslocamento = 0) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() + deslocamento);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+    function atualizarChips() {
+      const mes = document.getElementById('filtro-mes').value;
+      document.querySelectorAll('#chips button').forEach((b) => {
+        const chip = b.dataset.chip;
+        const ativo =
+          (chip === 'todos' && !mes && !somentePendentes) ||
+          (chip === 'mes-atual' && mes === mesISO(0) && !somentePendentes) ||
+          (chip === 'mes-anterior' && mes === mesISO(-1) && !somentePendentes) ||
+          (chip === 'pendentes' && somentePendentes);
+        b.classList.toggle('ativo', ativo);
+      });
+    }
+    document.getElementById('chips').addEventListener('click', (ev) => {
+      const botao = ev.target.closest('button[data-chip]');
+      if (!botao) return;
+      const chip = botao.dataset.chip;
+      const filtroMes = document.getElementById('filtro-mes');
+      somentePendentes = chip === 'pendentes' ? !somentePendentes : false;
+      if (chip === 'todos') filtroMes.value = '';
+      if (chip === 'mes-atual') filtroMes.value = mesISO(0);
+      if (chip === 'mes-anterior') filtroMes.value = mesISO(-1);
+      atualizarChips();
+      carregarFretes();
+    });
+
+    // --- KPIs ---
+    function deltaHTML(atual, anterior, formatar) {
+      if (anterior == null || anterior === 0) return 'sem base de comparação no mês anterior';
+      const diferenca = atual - anterior;
+      const seta = diferenca >= 0 ? '▲' : '▼';
+      const classe = diferenca >= 0 ? 'sobe' : 'desce';
+      return `<span class="${classe}">${seta} ${formatar(Math.abs(diferenca))}</span> vs. mês anterior`;
+    }
+    async function carregarResumo() {
+      const r = await api('/api/resumo');
+      const inteiro = new Intl.NumberFormat('pt-BR');
+      document.getElementById('kpi-fretes').textContent = inteiro.format(r.mes_atual.fretes);
+      document.getElementById('kpi-fretes-delta').innerHTML =
+        deltaHTML(r.mes_atual.fretes, r.mes_anterior.fretes, (v) => inteiro.format(v));
+      document.getElementById('kpi-faturamento').textContent = fmtBRL.format(r.mes_atual.faturamento);
+      document.getElementById('kpi-faturamento-delta').innerHTML =
+        deltaHTML(r.mes_atual.faturamento, r.mes_anterior.faturamento, (v) => fmtBRL.format(v));
+      document.getElementById('kpi-medio').textContent =
+        r.mes_atual.valor_medio_ton != null ? fmtBRL.format(r.mes_atual.valor_medio_ton) : '—';
+      document.getElementById('kpi-medio-delta').innerHTML =
+        r.mes_atual.valor_medio_ton != null && r.mes_anterior.valor_medio_ton != null
+          ? deltaHTML(r.mes_atual.valor_medio_ton, r.mes_anterior.valor_medio_ton, (v) => fmtBRL.format(v))
+          : 'faturamento ÷ peso do mês';
+      document.getElementById('kpi-pendentes').textContent = inteiro.format(r.pendentes);
+      document.getElementById('kpi-pendentes-delta').innerHTML = r.pendentes > 0
+        ? '<span class="atencao">requer atenção</span> — use o filtro rápido'
+        : 'nenhuma pendência 🎉';
+    }
+
+    // Data de hoje no cabeçalho
+    document.getElementById('cab-data').textContent = new Date().toLocaleDateString('pt-BR', {
+      weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
     });
 
     modoCadastro();
     carregarOpcoes().catch(() => {});
+    carregarResumo().catch(() => {});
     carregarFretes().catch(() => mostrarMensagem('Erro ao carregar fretes', 'erro'));
   </script>
 </body>

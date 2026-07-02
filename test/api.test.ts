@@ -218,6 +218,35 @@ describe('fretes', () => {
   });
 });
 
+describe('busca global e resumo', () => {
+  it('busca por motorista, cidade, placa ou nota num único parâmetro', async () => {
+    const porMotorista = await api('/api/fretes?busca=Maycon');
+    assert.ok(porMotorista.corpo.length >= 1);
+    assert.ok(porMotorista.corpo.every((f: any) => f.motorista === 'Maycon'));
+
+    const porNota = await api('/api/fretes?busca=402017');
+    assert.equal(porNota.corpo.length, 1);
+
+    const porCidade = await api('/api/fretes?busca=Joaçaba');
+    assert.ok(porCidade.corpo.length >= 1);
+
+    const nada = await api('/api/fretes?busca=inexistente-xyz');
+    assert.equal(nada.corpo.length, 0);
+  });
+
+  it('retorna os KPIs do painel', async () => {
+    const resp = await api('/api/resumo');
+    assert.equal(resp.status, 200);
+    assert.ok(typeof resp.corpo.mes_atual.fretes === 'number');
+    assert.ok(typeof resp.corpo.mes_atual.faturamento === 'number');
+    assert.ok(typeof resp.corpo.mes_anterior.fretes === 'number');
+    assert.ok(typeof resp.corpo.pendentes === 'number');
+    assert.ok(typeof resp.corpo.registrados_hoje === 'number');
+    // todos os fretes de teste foram criados agora
+    assert.ok(resp.corpo.registrados_hoje >= 1);
+  });
+});
+
 describe('consulta por nota', () => {
   it('retorna o frete e o valor rateado da nota', async () => {
     const resp = await api('/api/notas/183191');

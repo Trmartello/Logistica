@@ -117,9 +117,18 @@ export function rotasFretes(db: DatabaseSync): Router {
   };
 
   router.get('/', (req, res) => {
-    const { mes, motorista, nota, pendentes } = req.query;
+    const { mes, motorista, nota, pendentes, busca } = req.query;
     const condicoes: string[] = [];
     const parametros: string[] = [];
+
+    if (typeof busca === 'string' && busca.trim() !== '') {
+      const termo = `%${busca.trim()}%`;
+      condicoes.push(
+        `(f.motorista LIKE ? OR f.placa_cc LIKE ? OR f.origem LIKE ? OR f.destino LIKE ?
+          OR f.id IN (SELECT frete_id FROM notas WHERE numero LIKE ?))`
+      );
+      parametros.push(termo, termo, termo, termo, termo);
+    }
 
     if (typeof mes === 'string' && mes !== '') {
       if (!/^\d{4}-\d{2}$/.test(mes)) {
@@ -262,6 +271,49 @@ export function rotaNotas(db: DatabaseSync): Router {
         valor_por_nota: valorPorNota(l.frete_total, l.total_notas),
       }))
     );
+  });
+  return router;
+}
+
+/** KPIs do painel: mês corrente × mês anterior e pendências. */
+export function rotaResumo(db: DatabaseSync): Router {
+  const router = Router();
+  router.get('/', (_req, res) => {
+    const doMes = (deslocamento: string) =>
+      db
+        .prepare(
+          `SELECT COUNT(*) AS fretes,
+                  COALESCE(SUM(frete_total), 0) AS faturamento,
+                  SUM(CASE WHEN frete_total IS NOT NULL AND peso_ton > 0 THEN frete_total END) AS total_com_peso,
+                  SUM(CASE WHEN frete_total IS NOT NULL AND peso_ton > 0 THEN peso_ton END) AS peso_com_total
+             FROM fretes
+            WHERE strftime('%Y-%m', data) = strftime('%Y-%m', 'now', ?)`
+        )
+        .get(deslocamento) as {
+        fretes: number;
+        faturamento: number;
+        total_com_peso: number | null;
+        peso_com_total: number | null;
+      };
+
+    const valorMedio = (m: ReturnType<typeof doMes>) =>
+      m.total_com_peso != null && m.peso_com_total ? m.total_com_peso / m.peso_com_total : null;
+
+    const atual = doMes('+0 days');
+    const anterior = doMes('-1 months');
+    const pendentes = db
+      .prepare('SELECT COUNT(*) AS total FROM fretes WHERE frete_total IS NULL')
+      .get() as { total: number };
+    const hoje = db
+      .prepare("SELECT COUNT(*) AS total FROM fretes WHERE date(criado_em) = date('now')")
+      .get() as { total: number };
+
+    res.json({
+      mes_atual: { fretes: atual.fretes, faturamento: atual.faturamento, valor_medio_ton: valorMedio(atual) },
+      mes_anterior: { fretes: anterior.fretes, faturamento: anterior.faturamento, valor_medio_ton: valorMedio(anterior) },
+      pendentes: pendentes.total,
+      registrados_hoje: hoje.total,
+    });
   });
   return router;
 }

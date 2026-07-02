@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import type { DatabaseSync } from 'node:sqlite';
-import { rotasFretes, rotaNotas, rotaOpcoes } from './rotas/fretes.js';
+import { rotasFretes, rotaNotas, rotaOpcoes, rotaResumo } from './rotas/fretes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,6 +14,7 @@ export function createApp(db: DatabaseSync): express.Express {
   app.use('/api/fretes', rotasFretes(db));
   app.use('/api/notas', rotaNotas(db));
   app.use('/api/opcoes', rotaOpcoes(db));
+  app.use('/api/resumo', rotaResumo(db));
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ erro: 'Rota não encontrada' });

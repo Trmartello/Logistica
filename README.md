@@ -46,6 +46,12 @@ Os campos de origem e destino sugerem, nesta ordem:
 
 Assim o frete pode ser identificado pela filial ou pelo município, na origem e/ou no destino. Os locais são semeados automaticamente no banco na primeira execução (tabela `locais`) e não precisam de atualização; digitar um valor fora da lista continua permitido.
 
+## Painel
+
+- **KPIs** no topo: fretes no mês, faturamento no mês, R$/t médio (faturamento ÷ peso) e fretes sem valor — com comparativo contra o mês anterior (`GET /api/resumo`).
+- **Busca global** no cabeçalho: encontra por nota, placa, motorista, origem ou destino (`GET /api/fretes?busca=`).
+- **Filtros rápidos** em chips: Todos, Este mês, Mês passado e Sem valor lançado.
+
 ## Lista de fretes
 
 - **⚙️ Colunas**: escolha quais colunas exibir e a ordenação; a preferência fica salva no navegador.
