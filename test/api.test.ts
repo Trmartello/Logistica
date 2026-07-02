@@ -263,6 +263,41 @@ describe('consulta por nota', () => {
   });
 });
 
+describe('proteção por senha (SENHA_ACESSO)', () => {
+  it('exige senha quando a variável está definida e libera com a senha correta', async () => {
+    process.env.SENHA_ACESSO = 'teste123';
+    const appProtegido = createApp(createDb(':memory:'));
+    delete process.env.SENHA_ACESSO;
+    const servidorProtegido = await new Promise<Server>((resolver) => {
+      const s = appProtegido.listen(0, () => resolver(s));
+    });
+    const endereco = servidorProtegido.address();
+    if (typeof endereco === 'string' || endereco === null) throw new Error('Endereço inesperado');
+    const baseProtegida = `http://127.0.0.1:${endereco.port}`;
+
+    const semSenha = await fetch(`${baseProtegida}/api/fretes`);
+    assert.equal(semSenha.status, 401);
+    assert.match(semSenha.headers.get('www-authenticate') ?? '', /Basic/);
+
+    const senhaErrada = await fetch(`${baseProtegida}/api/fretes`, {
+      headers: { Authorization: `Basic ${Buffer.from('usuario:errada').toString('base64')}` },
+    });
+    assert.equal(senhaErrada.status, 401);
+
+    const senhaCerta = await fetch(`${baseProtegida}/api/fretes`, {
+      headers: { Authorization: `Basic ${Buffer.from('usuario:teste123').toString('base64')}` },
+    });
+    assert.equal(senhaCerta.status, 200);
+
+    servidorProtegido.close();
+  });
+
+  it('mantém acesso livre quando a variável não está definida', async () => {
+    const resp = await api('/api/fretes');
+    assert.equal(resp.status, 200);
+  });
+});
+
 describe('opções de autocompletar', () => {
   it('lista motoristas, placas e cidades distintos', async () => {
     const resp = await api('/api/opcoes');

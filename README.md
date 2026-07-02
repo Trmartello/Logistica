@@ -97,6 +97,14 @@ test/
   api.test.ts        # testes de integração da API
 ```
 
+## Publicar na internet (Fly.io)
+
+O repositório já traz `Dockerfile` e `fly.toml` (app `logistica-gdaqnw`, região São Paulo). Pontos importantes:
+
+- O banco fica num **volume persistente** montado em `/data` — os dados sobrevivem a deploys e reinícios.
+- Defina a senha de acesso antes de divulgar o link: `fly secrets set SENHA_ACESSO=suasenha` (sem essa variável o sistema fica aberto; em uso local/rede interna ela é desnecessária).
+- Para subir um banco já populado: `fly ssh sftp shell` → `put logistica.db /data/logistica.db` → `fly apps restart`.
+
 ## Próximos passos possíveis
 
 - Exportar para Excel/CSV (relatório mensal por motorista)

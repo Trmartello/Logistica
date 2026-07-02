@@ -8,6 +8,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function createApp(db: DatabaseSync): express.Express {
   const app = express();
+
+  // Proteção por senha (para exposição na internet): defina SENHA_ACESSO.
+  // Sem a variável (uso local/rede interna), o acesso permanece livre.
+  const senha = process.env.SENHA_ACESSO;
+  if (senha) {
+    app.use((req, res, next) => {
+      const [tipo, credenciais] = (req.headers.authorization ?? '').split(' ');
+      if (tipo === 'Basic' && credenciais) {
+        const decodificado = Buffer.from(credenciais, 'base64').toString();
+        if (decodificado.slice(decodificado.indexOf(':') + 1) === senha) return next();
+      }
+      res.set('WWW-Authenticate', 'Basic realm="Controle de Fretes", charset="UTF-8"');
+      res.status(401).send('Acesso restrito — informe a senha.');
+    });
+  }
+
   app.use(express.json());
   app.use(express.static(path.join(__dirname, '..', 'public')));
 

@@ -1,0 +1,26 @@
+# Configuração do Fly.io — Controle de Fretes
+app = "logistica-gdaqnw"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  # O banco fica no volume persistente para sobreviver a deploys/reinícios
+  DB_PATH = "/data/logistica.db"
+
+[mounts]
+  source = "dados"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
