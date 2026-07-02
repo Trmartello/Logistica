@@ -349,3 +349,56 @@ describe('opções de autocompletar', () => {
     assert.equal(cidades.filter((c: string) => c === 'CONCÓRDIA - SC').length, 1);
   });
 });
+
+// Executa por último: a opção "substituir tudo" apaga os fretes das suítes anteriores.
+describe('importação de planilha', () => {
+  it('importa .xlsx, separa múltiplas notas e permite substituir tudo', async () => {
+    const { default: XLSX } = await import('xlsx');
+    const aba = XLSX.utils.aoa_to_sheet([
+      ['Motorista', 'PLACA / CC', 'DATA ', 'MÊS', 'ORIGEM', 'DESTINO', 'NOTA', 'PESO ', 'FRETE VALOR ', 'FRETE PESO NF', 'FRETE TOTAL'],
+      ['Importado A', 'AAA0X00 CC 1', 45965, 'NOVEMBRO', 'JOAÇABA', 'CONCÓRDIA', '900001 / 900002', 33.94, 45, 1527.3, 1530],
+      ['Importado B', 'BBB0X00 CC 2', 45966, 'NOVEMBRO', 'SEARA', 'MAFRA', 900003, 20, 80, 1600, 1600],
+      ['Importado C', null, 'texto-invalido', 'NOVEMBRO', 'ITA', 'PALMAS', 900004, 10, 50, 500, 500],
+    ]);
+    const livro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(livro, aba, 'BASE DADOS');
+    const conteudo = XLSX.write(livro, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+
+    const resp = await fetch(`${base}/api/importar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: new Uint8Array(conteudo),
+    });
+    const corpo = (await resp.json()) as any;
+    assert.equal(resp.status, 200);
+    assert.equal(corpo.importados, 2);
+    assert.equal(corpo.ignorados, 1);
+
+    const multiNota = await api('/api/notas/900001');
+    assert.equal(multiNota.corpo[0].total_notas, 2);
+    assert.equal(multiNota.corpo[0].motorista, 'Importado A');
+
+    // origem/destino da planilha viram locais personalizados
+    const opcoes = await api('/api/opcoes');
+    assert.ok(opcoes.corpo.cidades.includes('JOAÇABA'));
+
+    // substituir tudo: só os 2 fretes da planilha permanecem
+    const respLimpar = await fetch(`${base}/api/importar?limpar=1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: new Uint8Array(conteudo),
+    });
+    assert.equal(respLimpar.status, 200);
+    const fretes = await api('/api/fretes');
+    assert.equal(fretes.corpo.length, 2);
+  });
+
+  it('rejeita conteúdo que não é planilha', async () => {
+    const resp = await fetch(`${base}/api/importar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: new Uint8Array(Buffer.from('isto não é um xlsx')),
+    });
+    assert.equal(resp.status, 400);
+  });
+});

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import type { DatabaseSync } from 'node:sqlite';
 import { rotasFretes, rotaNotas, rotaOpcoes, rotaResumo } from './rotas/fretes.js';
+import { importarPlanilha } from './importar-planilha.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,6 +32,28 @@ export function createApp(db: DatabaseSync): express.Express {
   app.use('/api/notas', rotaNotas(db));
   app.use('/api/opcoes', rotaOpcoes(db));
   app.use('/api/resumo', rotaResumo(db));
+
+  // Importação da planilha .xlsx enviada pela tela do sistema
+  app.post(
+    '/api/importar',
+    express.raw({ type: () => true, limit: '25mb' }),
+    (req, res) => {
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return res.status(400).json({ erro: 'Envie o arquivo .xlsx no corpo da requisição' });
+      }
+      try {
+        const resultado = importarPlanilha(db, req.body, {
+          limparAntes: req.query.limpar === '1',
+        });
+        res.json(resultado);
+      } catch (erro) {
+        res.status(400).json({
+          erro: 'Não foi possível ler a planilha — confira se é o .xlsx no formato BASE DADOS',
+          detalhe: erro instanceof Error ? erro.message : String(erro),
+        });
+      }
+    }
+  );
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ erro: 'Rota não encontrada' });
