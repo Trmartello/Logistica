@@ -239,4 +239,21 @@ describe('opções de autocompletar', () => {
     assert.ok(resp.corpo.cidades.includes('Concórdia'));
     assert.ok(resp.corpo.cidades.includes('Campo Alegre'));
   });
+
+  it('inclui filiais primeiro e municípios-UF em seguida nas cidades', async () => {
+    const resp = await api('/api/opcoes');
+    const { cidades } = resp.corpo;
+    assert.ok(cidades.includes('1 - MATRIZ'));
+    assert.ok(cidades.includes('2 - LINDOIA DO SUL'));
+    assert.ok(cidades.includes('LINDOIA DO SUL - SC'));
+    assert.ok(cidades.includes('CONCORDIA - SC'));
+    // ordem: toda filial vem antes de qualquer município
+    const ultimaFilial = Math.max(
+      ...cidades.map((c: string, i: number) => (/^\d+ - /.test(c) ? i : -1))
+    );
+    const primeiroMunicipio = cidades.indexOf('AGUA DOCE - SC');
+    assert.ok(ultimaFilial < primeiroMunicipio);
+    // valores livres digitados nos fretes continuam disponíveis, ao final
+    assert.ok(cidades.indexOf('Concórdia') > primeiroMunicipio);
+  });
 });

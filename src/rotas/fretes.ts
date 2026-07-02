@@ -261,16 +261,23 @@ export function rotaOpcoes(db: DatabaseSync): Router {
     const pendentes = db
       .prepare('SELECT COUNT(*) AS total FROM fretes WHERE frete_total IS NULL')
       .get() as { total: number };
+    // Origem/destino: filiais primeiro, depois municípios-UF e, por fim,
+    // valores livres já usados em fretes que não estão no cadastro de locais.
+    const locais = coluna(
+      `SELECT nome AS v FROM locais
+        ORDER BY CASE tipo WHEN 'FILIAL' THEN 0 ELSE 1 END, ordem`
+    );
+    const usados = coluna(
+      `SELECT DISTINCT v FROM (
+         SELECT origem AS v FROM fretes UNION SELECT destino AS v FROM fretes
+       ) WHERE v NOT IN (SELECT nome FROM locais) ORDER BY v`
+    );
     res.json({
       motoristas: coluna('SELECT DISTINCT motorista AS v FROM fretes ORDER BY motorista'),
       placas: coluna(
         'SELECT DISTINCT placa_cc AS v FROM fretes WHERE placa_cc IS NOT NULL ORDER BY placa_cc'
       ),
-      cidades: coluna(
-        `SELECT DISTINCT v FROM (
-           SELECT origem AS v FROM fretes UNION SELECT destino AS v FROM fretes
-         ) ORDER BY v`
-      ),
+      cidades: [...locais, ...usados],
       fretes_pendentes: pendentes.total,
     });
   });

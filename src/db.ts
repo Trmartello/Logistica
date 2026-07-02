@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { FILIAIS, MUNICIPIOS } from './dados/locais.js';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS fretes (
@@ -18,6 +19,13 @@ CREATE TABLE IF NOT EXISTS notas (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
   frete_id INTEGER NOT NULL REFERENCES fretes(id) ON DELETE CASCADE,
   numero   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS locais (
+  id    INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome  TEXT NOT NULL UNIQUE,
+  tipo  TEXT NOT NULL CHECK (tipo IN ('FILIAL', 'MUNICIPIO')),
+  ordem INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_fretes_data ON fretes(data);
@@ -71,11 +79,29 @@ function migrarValorOpcional(db: DatabaseSync): void {
   }
 }
 
+/** Cadastra os locais fixos (filiais e municípios-UF) na primeira execução. */
+function semearLocais(db: DatabaseSync): void {
+  const existentes = db.prepare('SELECT COUNT(*) AS total FROM locais').get() as { total: number };
+  if (existentes.total > 0) return;
+
+  const insere = db.prepare('INSERT INTO locais (nome, tipo, ordem) VALUES (?, ?, ?)');
+  db.exec('BEGIN');
+  try {
+    FILIAIS.forEach((nome, indice) => insere.run(nome, 'FILIAL', indice));
+    MUNICIPIOS.forEach((nome, indice) => insere.run(nome, 'MUNICIPIO', indice));
+    db.exec('COMMIT');
+  } catch (erro) {
+    db.exec('ROLLBACK');
+    throw erro;
+  }
+}
+
 export function createDb(path: string = process.env.DB_PATH ?? 'logistica.db'): DatabaseSync {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA foreign_keys = ON;');
   if (path !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
   migrarValorOpcional(db);
+  semearLocais(db);
   return db;
 }
