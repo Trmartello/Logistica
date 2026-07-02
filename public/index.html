@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Logística — Controle de Fretes</title>
+  <title>Controle de Fretes</title>
   <style>
     :root {
       --fundo: #f4f5f7; --superficie: #ffffff; --borda: #e0e2e8;
@@ -15,47 +15,94 @@
       background: var(--fundo); color: var(--texto);
     }
     header {
-      background: var(--superficie); border-bottom: 1px solid var(--borda);
-      padding: 16px 24px; display: flex; align-items: center; gap: 12px;
+      background: var(--primaria); color: #fff;
+      padding: 14px 16px; position: sticky; top: 0; z-index: 10;
     }
-    header h1 { font-size: 18px; margin: 0; }
-    main { max-width: 1200px; margin: 0 auto; padding: 24px; }
-    section { background: var(--superficie); border: 1px solid var(--borda); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
-    h2 { font-size: 15px; margin: 0 0 16px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--borda); white-space: nowrap; }
-    td.quebra { white-space: normal; }
-    th { color: var(--texto-suave); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
-    .num { text-align: right; }
-    .tabela-scroll { overflow-x: auto; }
-    .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-    label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--texto-suave); font-weight: 600; }
+    header h1 { font-size: 17px; margin: 0; }
+    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    section {
+      background: var(--superficie); border: 1px solid var(--borda);
+      border-radius: 10px; padding: 16px; margin-bottom: 16px;
+    }
+    h2 { font-size: 15px; margin: 0 0 14px; }
+
+    /* ---- Formulário: 1 coluna no celular, grade no desktop ---- */
+    .grade { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--texto-suave); font-weight: 600; }
     input, select, button {
-      padding: 8px 10px; border: 1px solid var(--borda); border-radius: 6px;
-      font-size: 14px; font-family: inherit; background: var(--superficie); color: var(--texto);
+      padding: 12px; border: 1px solid var(--borda); border-radius: 8px;
+      font-size: 16px; font-family: inherit; background: var(--superficie);
+      color: var(--texto); width: 100%; min-height: 46px;
     }
     button { background: var(--primaria); color: #fff; border: none; cursor: pointer; font-weight: 600; }
-    button:hover { filter: brightness(1.1); }
+    button:active { filter: brightness(0.92); }
     button.secundario { background: transparent; color: var(--primaria); border: 1px solid var(--primaria); }
-    button.excluir { background: transparent; color: var(--perigo); border: none; padding: 2px 6px; font-size: 15px; }
-    .notas-area { margin-top: 14px; }
-    .notas-linha { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .notas-linha input { width: 150px; }
-    .badge-nota { display: inline-block; background: #eef2fa; border: 1px solid #ccd8ef; color: #1f4e96; border-radius: 4px; padding: 1px 7px; font-size: 12px; margin: 1px 2px; }
-    .acoes-form { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
-    #mensagem { font-size: 13px; }
+    .notas-area { margin-top: 12px; }
+    .notas-area > label { margin-bottom: 6px; }
+    .notas-linha { display: flex; flex-wrap: wrap; gap: 8px; }
+    .campo-nota-grupo { display: flex; align-items: center; gap: 4px; }
+    .campo-nota { width: 140px; }
+    .tirar-nota { width: 34px; min-height: 34px; padding: 0; background: transparent; color: var(--perigo); border: none; font-size: 18px; }
+    #add-nota { width: auto; }
+    .acoes-form { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+    #mensagem { font-size: 14px; min-height: 1em; }
     #mensagem.erro { color: var(--perigo); }
     #mensagem.ok { color: #1a6b3c; }
-    .filtros { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: end; }
-    .filtros label { min-width: 150px; }
-    .resumo { font-size: 13px; color: var(--texto-suave); margin-bottom: 8px; }
+
+    /* ---- Filtros ---- */
+    .filtros { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .filtros .largura-toda { grid-column: 1 / -1; }
+    .resumo { font-size: 14px; color: var(--texto-suave); margin-bottom: 10px; }
     .resumo strong { color: var(--texto); }
-    .vazio { color: var(--texto-suave); padding: 24px; text-align: center; }
+
+    /* ---- Lista: cartões no celular ---- */
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead { display: none; }
+    tr.frete {
+      display: block; border: 1px solid var(--borda); border-radius: 10px;
+      padding: 12px; margin-bottom: 10px; background: var(--superficie);
+    }
+    td { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border: none; }
+    td::before { content: attr(data-rotulo); color: var(--texto-suave); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+    td.sem-rotulo::before { content: none; }
+    td.destaque { font-weight: 700; font-size: 15px; }
+    td.celula-acoes { display: flex; gap: 8px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--borda); }
+    td.celula-acoes button { min-height: 40px; padding: 8px; }
+    td.celula-acoes .excluir { background: transparent; color: var(--perigo); border: 1px solid var(--perigo); }
+    .badge-nota {
+      display: inline-block; background: #eef2fa; border: 1px solid #ccd8ef; color: #1f4e96;
+      border-radius: 5px; padding: 2px 8px; font-size: 13px; margin: 1px 2px;
+    }
+    .notas-celula { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+    .vazio { color: var(--texto-suave); padding: 24px; text-align: center; display: block; }
+
+    /* ---- Desktop (≥ 800px): formulário em grade e lista em tabela ---- */
+    @media (min-width: 800px) {
+      header h1 { font-size: 18px; }
+      .grade { grid-template-columns: repeat(4, 1fr); }
+      .acoes-form { flex-direction: row; align-items: center; }
+      .acoes-form button { width: auto; min-width: 160px; }
+      .filtros { grid-template-columns: 2fr 1fr 1fr auto; align-items: end; }
+      .filtros .largura-toda { grid-column: auto; }
+      input, select, button { font-size: 14px; padding: 9px 10px; min-height: 40px; }
+      table { border: none; }
+      thead { display: table-header-group; }
+      thead th { text-align: left; padding: 8px 10px; color: var(--texto-suave); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--borda); white-space: nowrap; }
+      tr.frete { display: table-row; border: none; padding: 0; }
+      td { display: table-cell; padding: 9px 10px; border-bottom: 1px solid var(--borda); white-space: nowrap; vertical-align: middle; }
+      td::before { content: none; }
+      td.celula-acoes { border-top: none; margin: 0; }
+      td.celula-acoes button { min-height: 34px; padding: 5px 12px; font-size: 13px; width: auto; }
+      .notas-celula { white-space: normal; text-align: left; justify-content: flex-start; }
+      td.destaque { font-size: 14px; }
+      .num { text-align: right; }
+      .tabela-scroll { overflow-x: auto; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>🚛 Logística — Controle de Fretes</h1>
+    <h1>🚛 Controle de Fretes</h1>
   </header>
   <main>
     <section>
@@ -64,28 +111,28 @@
         <input type="hidden" name="id">
         <div class="grade">
           <label>Motorista*
-            <input name="motorista" list="lista-motoristas" required>
+            <input name="motorista" list="lista-motoristas" required autocomplete="off">
           </label>
           <label>Placa / CC
-            <input name="placa_cc" list="lista-placas">
+            <input name="placa_cc" list="lista-placas" autocomplete="off">
           </label>
           <label>Data*
             <input name="data" type="date" required>
           </label>
           <label>Origem*
-            <input name="origem" list="lista-cidades" required>
+            <input name="origem" list="lista-cidades" required autocomplete="off">
           </label>
           <label>Destino*
-            <input name="destino" list="lista-cidades" required>
+            <input name="destino" list="lista-cidades" required autocomplete="off">
           </label>
           <label>Peso (t)
-            <input name="peso_ton" type="number" step="0.001" min="0">
+            <input name="peso_ton" type="number" step="0.001" min="0" inputmode="decimal">
           </label>
           <label>Valor (R$/t)*
-            <input name="valor_ton" type="number" step="0.01" min="0.01" required>
+            <input name="valor_ton" type="number" step="0.01" min="0.01" required inputmode="decimal">
           </label>
           <label>Frete total (R$)
-            <input name="frete_total" type="number" step="0.01" min="0" placeholder="auto: 34 t × valor">
+            <input name="frete_total" type="number" step="0.01" min="0" inputmode="decimal" placeholder="auto: 34 t × valor">
           </label>
         </div>
         <div class="notas-area">
@@ -108,8 +155,8 @@
     <section>
       <h2>Fretes cadastrados</h2>
       <div class="filtros">
-        <label>Buscar por nota
-          <input id="filtro-nota" placeholder="nº da nota">
+        <label class="largura-toda">Buscar por nota
+          <input id="filtro-nota" placeholder="nº da nota" inputmode="numeric">
         </label>
         <label>Mês
           <input id="filtro-mes" type="month">
@@ -117,7 +164,7 @@
         <label>Motorista
           <select id="filtro-motorista"><option value="">Todos</option></select>
         </label>
-        <button type="button" class="secundario" id="limpar-filtros">Limpar</button>
+        <button type="button" class="secundario largura-toda" id="limpar-filtros">Limpar filtros</button>
       </div>
       <div class="resumo" id="resumo"></div>
       <div class="tabela-scroll">
@@ -164,12 +211,22 @@
 
     // --- Campos dinâmicos de nota ---
     function adicionarCampoNota(valor = '') {
+      const grupo = document.createElement('span');
+      grupo.className = 'campo-nota-grupo';
       const input = document.createElement('input');
       input.placeholder = 'nº da nota';
       input.className = 'campo-nota';
+      input.inputMode = 'numeric';
       input.value = valor;
-      notasLinha.insertBefore(input, addNotaBtn);
-      input.focus();
+      const remover = document.createElement('button');
+      remover.type = 'button';
+      remover.className = 'tirar-nota';
+      remover.textContent = '✕';
+      remover.title = 'Remover nota';
+      remover.addEventListener('click', () => grupo.remove());
+      grupo.append(input, remover);
+      notasLinha.insertBefore(grupo, addNotaBtn);
+      if (!valor) input.focus();
       return input;
     }
     addNotaBtn.addEventListener('click', () => adicionarCampoNota());
@@ -179,7 +236,7 @@
         .filter((v) => v !== '');
     }
     function limparCamposNota() {
-      notasLinha.querySelectorAll('.campo-nota').forEach((c) => c.remove());
+      notasLinha.querySelectorAll('.campo-nota-grupo').forEach((c) => c.remove());
     }
 
     // --- Formulário (cadastro e edição) ---
@@ -275,24 +332,24 @@
         `<strong>${fretesAtuais.length}</strong> frete(s) — total <strong>${fmtBRL.format(soma)}</strong>`;
 
       if (fretesAtuais.length === 0) {
-        corpo.innerHTML = '<tr><td colspan="11" class="vazio">Nenhum frete encontrado</td></tr>';
+        corpo.innerHTML = '<tr><td colspan="11" class="vazio sem-rotulo">Nenhum frete encontrado</td></tr>';
         return;
       }
       corpo.innerHTML = fretesAtuais.map((f) => `
-        <tr>
-          <td>${dataBR(f.data)}</td>
-          <td>${f.motorista}</td>
-          <td>${f.placa_cc ?? '—'}</td>
-          <td>${f.origem}</td>
-          <td>${f.destino}</td>
-          <td class="quebra">${f.notas.length ? f.notas.map((n) => `<span class="badge-nota">${n}</span>`).join('') : '—'}</td>
-          <td class="num">${f.peso_ton != null ? fmtNum.format(f.peso_ton) : '—'}</td>
-          <td class="num">${fmtBRL.format(f.valor_ton)}</td>
-          <td class="num"><strong>${fmtBRL.format(f.frete_total)}</strong></td>
-          <td class="num">${f.valor_por_nota != null ? fmtBRL.format(f.valor_por_nota) : '—'}</td>
-          <td>
+        <tr class="frete">
+          <td data-rotulo="Data">${dataBR(f.data)}</td>
+          <td data-rotulo="Motorista">${f.motorista}</td>
+          <td data-rotulo="Placa / CC">${f.placa_cc ?? '—'}</td>
+          <td data-rotulo="Origem">${f.origem}</td>
+          <td data-rotulo="Destino">${f.destino}</td>
+          <td data-rotulo="Notas" class="notas-celula">${f.notas.length ? f.notas.map((n) => `<span class="badge-nota">${n}</span>`).join('') : '—'}</td>
+          <td data-rotulo="Peso (t)" class="num">${f.peso_ton != null ? fmtNum.format(f.peso_ton) : '—'}</td>
+          <td data-rotulo="R$/t" class="num">${fmtBRL.format(f.valor_ton)}</td>
+          <td data-rotulo="Frete total" class="num destaque">${fmtBRL.format(f.frete_total)}</td>
+          <td data-rotulo="R$ / nota" class="num">${f.valor_por_nota != null ? fmtBRL.format(f.valor_por_nota) : '—'}</td>
+          <td class="celula-acoes sem-rotulo">
             <button type="button" class="secundario" data-editar="${f.id}">Editar</button>
-            <button type="button" class="excluir" data-excluir="${f.id}" title="Excluir">✕</button>
+            <button type="button" class="excluir" data-excluir="${f.id}">Excluir</button>
           </td>
         </tr>`).join('');
     }
