@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS notas (
 CREATE TABLE IF NOT EXISTS locais (
   id    INTEGER PRIMARY KEY AUTOINCREMENT,
   nome  TEXT NOT NULL UNIQUE,
-  tipo  TEXT NOT NULL CHECK (tipo IN ('FILIAL', 'MUNICIPIO')),
+  tipo  TEXT NOT NULL CHECK (tipo IN ('FILIAL', 'MUNICIPIO', 'PERSONALIZADO')),
   ordem INTEGER NOT NULL
 );
 
@@ -79,10 +79,22 @@ function migrarValorOpcional(db: DatabaseSync): void {
   }
 }
 
+/** Bancos criados antes do tipo PERSONALIZADO têm um CHECK que o rejeita. */
+function migrarLocaisPersonalizados(db: DatabaseSync): void {
+  const definicao = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'locais'")
+    .get() as { sql: string } | undefined;
+  if (definicao && !definicao.sql.includes('PERSONALIZADO')) {
+    // Só há dados fixos na tabela antiga — o seed repõe tudo em seguida.
+    db.exec('DROP TABLE locais');
+    db.exec(SCHEMA);
+  }
+}
+
 /**
- * Cadastra os locais fixos (filiais e municípios-UF). A tabela é somente de
- * referência: se a quantidade gravada divergir das listas do código (ex.:
- * banco semeado com uma versão anterior), ela é reconstruída.
+ * Cadastra os locais fixos (filiais e municípios-UF). Se a quantidade gravada
+ * divergir das listas do código (ex.: banco semeado com uma versão anterior),
+ * os locais fixos são reconstruídos — preservando os personalizados.
  */
 function semearLocais(db: DatabaseSync): void {
   const contagem = db
@@ -93,14 +105,25 @@ function semearLocais(db: DatabaseSync): void {
        FROM locais`
     )
     .get() as { filiais: number | null; municipios: number | null };
-  if (contagem.filiais === FILIAIS.length && contagem.municipios === MUNICIPIOS.length) return;
+  const fixosAtualizados =
+    contagem.filiais === FILIAIS.length && contagem.municipios === MUNICIPIOS.length;
 
-  const insere = db.prepare('INSERT INTO locais (nome, tipo, ordem) VALUES (?, ?, ?)');
   db.exec('BEGIN');
   try {
-    db.exec('DELETE FROM locais');
-    FILIAIS.forEach((nome, indice) => insere.run(nome, 'FILIAL', indice));
-    MUNICIPIOS.forEach((nome, indice) => insere.run(nome, 'MUNICIPIO', indice));
+    if (!fixosAtualizados) {
+      db.exec("DELETE FROM locais WHERE tipo IN ('FILIAL', 'MUNICIPIO')");
+      const insere = db.prepare('INSERT INTO locais (nome, tipo, ordem) VALUES (?, ?, ?)');
+      FILIAIS.forEach((nome, indice) => insere.run(nome, 'FILIAL', indice));
+      MUNICIPIOS.forEach((nome, indice) => insere.run(nome, 'MUNICIPIO', indice));
+    }
+    // Origens/destinos já usados em fretes e ainda fora do cadastro entram
+    // como locais personalizados (ex.: dados importados da planilha).
+    db.exec(`
+      INSERT INTO locais (nome, tipo, ordem)
+      SELECT v, 'PERSONALIZADO', 0
+        FROM (SELECT origem AS v FROM fretes UNION SELECT destino AS v FROM fretes)
+       WHERE NOT EXISTS (SELECT 1 FROM locais l WHERE l.nome = v COLLATE NOCASE)
+    `);
     db.exec('COMMIT');
   } catch (erro) {
     db.exec('ROLLBACK');
@@ -114,6 +137,7 @@ export function createDb(path: string = process.env.DB_PATH ?? 'logistica.db'): 
   if (path !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
   migrarValorOpcional(db);
+  migrarLocaisPersonalizados(db);
   semearLocais(db);
   return db;
 }

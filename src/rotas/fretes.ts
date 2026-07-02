@@ -81,6 +81,18 @@ function valorPorNota(freteTotal: number | null, quantidadeNotas: number): numbe
 export function rotasFretes(db: DatabaseSync): Router {
   const router = Router();
 
+  // Origem/destino digitados fora do cadastro entram como locais
+  // personalizados e passam a ser sugeridos nos próximos fretes.
+  const registraLocal = db.prepare(
+    `INSERT INTO locais (nome, tipo, ordem)
+     SELECT ?, 'PERSONALIZADO', 0
+      WHERE NOT EXISTS (SELECT 1 FROM locais WHERE nome = ? COLLATE NOCASE)`
+  );
+  const registrarLocaisDoFrete = (dados: DadosFrete) => {
+    registraLocal.run(dados.origem, dados.origem);
+    registraLocal.run(dados.destino, dados.destino);
+  };
+
   const anexarNotas = (fretes: Frete[]): unknown[] => {
     if (fretes.length === 0) return [];
     const porFrete = new Map<number, string[]>();
@@ -169,6 +181,7 @@ export function rotasFretes(db: DatabaseSync): Router {
       const id = inserido.lastInsertRowid as number;
       const insereNota = db.prepare('INSERT INTO notas (frete_id, numero) VALUES (?, ?)');
       for (const numero of dados.notas) insereNota.run(id, numero);
+      registrarLocaisDoFrete(dados);
       db.exec('COMMIT');
 
       const frete = db.prepare('SELECT * FROM fretes WHERE id = ?').get(id) as Frete;
@@ -207,6 +220,7 @@ export function rotasFretes(db: DatabaseSync): Router {
       db.prepare('DELETE FROM notas WHERE frete_id = ?').run(req.params.id as string);
       const insereNota = db.prepare('INSERT INTO notas (frete_id, numero) VALUES (?, ?)');
       for (const numero of dados.notas) insereNota.run(req.params.id as string, numero);
+      registrarLocaisDoFrete(dados);
       db.exec('COMMIT');
 
       const frete = db.prepare('SELECT * FROM fretes WHERE id = ?').get(req.params.id) as Frete;
@@ -262,22 +276,19 @@ export function rotaOpcoes(db: DatabaseSync): Router {
       .prepare('SELECT COUNT(*) AS total FROM fretes WHERE frete_total IS NULL')
       .get() as { total: number };
     // Origem/destino: filiais primeiro, depois municípios-UF e, por fim,
-    // valores livres já usados em fretes que não estão no cadastro de locais.
+    // os locais personalizados cadastrados pelos usuários.
     const locais = coluna(
       `SELECT nome AS v FROM locais
-        ORDER BY CASE tipo WHEN 'FILIAL' THEN 0 ELSE 1 END, ordem`
-    );
-    const usados = coluna(
-      `SELECT DISTINCT v FROM (
-         SELECT origem AS v FROM fretes UNION SELECT destino AS v FROM fretes
-       ) WHERE v NOT IN (SELECT nome FROM locais) ORDER BY v`
+        ORDER BY CASE tipo WHEN 'FILIAL' THEN 0 WHEN 'MUNICIPIO' THEN 1 ELSE 2 END,
+                 CASE WHEN tipo = 'PERSONALIZADO' THEN nome END,
+                 ordem`
     );
     res.json({
       motoristas: coluna('SELECT DISTINCT motorista AS v FROM fretes ORDER BY motorista'),
       placas: coluna(
         'SELECT DISTINCT placa_cc AS v FROM fretes WHERE placa_cc IS NOT NULL ORDER BY placa_cc'
       ),
-      cidades: [...locais, ...usados],
+      cidades: locais,
       fretes_pendentes: pendentes.total,
     });
   });

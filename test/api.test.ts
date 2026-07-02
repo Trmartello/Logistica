@@ -258,4 +258,25 @@ describe('opções de autocompletar', () => {
     // valores livres digitados nos fretes continuam disponíveis, ao final
     assert.ok(cidades.indexOf('Concórdia') > primeiroMunicipio);
   });
+
+  it('guarda origem/destino personalizados no banco ao salvar o frete', async () => {
+    const criado = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({
+        motorista: 'Juliano',
+        data: '2026-03-10',
+        origem: 'FAZENDA SANTA LUZIA',
+        destino: 'CONCÓRDIA - SC',
+        valor_ton: 80,
+      }),
+    });
+    assert.equal(criado.status, 201);
+
+    const opcoes = await api('/api/opcoes');
+    const { cidades } = opcoes.corpo;
+    assert.ok(cidades.includes('FAZENDA SANTA LUZIA'));
+    // personalizado fica depois dos municípios e não duplica local existente
+    assert.ok(cidades.indexOf('FAZENDA SANTA LUZIA') > cidades.indexOf('ZORTÉA - SC'));
+    assert.equal(cidades.filter((c: string) => c === 'CONCÓRDIA - SC').length, 1);
+  });
 });
