@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import type { DatabaseSync } from 'node:sqlite';
-import { PESO_COBRANCA_PADRAO_TON } from '../db.js';
 
 interface Frete {
   id: number;
@@ -34,24 +33,24 @@ function validarFrete(corpo: Record<string, unknown>): { erro: string } | { dado
     return { erro: 'Campo data deve estar no formato YYYY-MM-DD' };
   }
 
-  // Valor é opcional: frete sem valor fica pendente de lançamento.
-  const valor = valor_ton == null || valor_ton === '' ? null : Number(valor_ton);
-  if (valor !== null && (!Number.isFinite(valor) || valor <= 0)) {
-    return { erro: 'Campo valor_ton deve ser um número positivo' };
-  }
   const peso = peso_ton == null || peso_ton === '' ? null : Number(peso_ton);
   if (peso !== null && (!Number.isFinite(peso) || peso < 0)) {
     return { erro: 'Campo peso_ton deve ser um número positivo' };
   }
 
-  let total: number | null;
-  if (frete_total != null && frete_total !== '') {
-    total = Number(frete_total);
-    if (!Number.isFinite(total) || total < 0) {
-      return { erro: 'Campo frete_total deve ser um número positivo' };
-    }
-  } else {
-    total = valor !== null ? valor * PESO_COBRANCA_PADRAO_TON : null;
+  // Frete total é opcional: sem ele o frete fica pendente de lançamento.
+  const total = frete_total == null || frete_total === '' ? null : Number(frete_total);
+  if (total !== null && (!Number.isFinite(total) || total < 0)) {
+    return { erro: 'Campo frete_total deve ser um número positivo' };
+  }
+
+  // Valor (R$/t): usa o informado; sem ele, é calculado como total ÷ peso.
+  let valor = valor_ton == null || valor_ton === '' ? null : Number(valor_ton);
+  if (valor !== null && (!Number.isFinite(valor) || valor <= 0)) {
+    return { erro: 'Campo valor_ton deve ser um número positivo' };
+  }
+  if (valor === null && total !== null && peso !== null && peso > 0) {
+    valor = Number((total / peso).toFixed(2));
   }
 
   const listaNotas = Array.isArray(notas)

@@ -32,9 +32,9 @@ O importador lê a primeira aba, converte as datas do Excel e separa células co
 
 ## Regra de cálculo
 
-- **Valor (R$/t)** é o preço por tonelada do trecho.
-- **Frete total** é preenchido automaticamente como `34 t × valor` (capacidade do caminhão — regra usada em ~99% da planilha), mas o campo é editável para os casos cobrados por peso real.
+- O cadastro (em modal) recebe **Peso (t)** e **Frete total (R$)**; o **Valor (R$/t)** é calculado automaticamente como `frete total ÷ peso`.
 - **Valor por nota** = frete total ÷ quantidade de notas do frete.
+- Cada registro guarda a **data e hora em que foi gravado** (`criado_em`), exibida na coluna "Registrado em".
 
 ## Origem e destino (locais)
 

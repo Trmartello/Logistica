@@ -34,9 +34,6 @@ CREATE INDEX IF NOT EXISTS idx_notas_frete ON notas(frete_id);
 CREATE INDEX IF NOT EXISTS idx_notas_numero ON notas(numero);
 `;
 
-/** Peso de cobrança padrão: capacidade do caminhão (34 t). */
-export const PESO_COBRANCA_PADRAO_TON = 34;
-
 /**
  * Bancos criados antes do suporte a "valor pendente" têm valor_ton/frete_total
  * como NOT NULL. O SQLite não permite remover a restrição diretamente, então a

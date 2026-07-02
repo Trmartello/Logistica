@@ -34,7 +34,7 @@ after(() => {
 describe('fretes', () => {
   let freteId: number;
 
-  it('cadastra frete com múltiplas notas e calcula o total padrão (34 t × valor)', async () => {
+  it('cadastra frete com múltiplas notas e calcula o valor (R$/t) = total ÷ peso', async () => {
     const resp = await api('/api/fretes', {
       method: 'POST',
       body: JSON.stringify({
@@ -44,18 +44,20 @@ describe('fretes', () => {
         origem: 'Concórdia',
         destino: 'Campo Alegre',
         peso_ton: 33.63,
-        valor_ton: 115,
+        frete_total: 3910,
         notas: ['183191', '183192'],
       }),
     });
     assert.equal(resp.status, 201);
-    assert.equal(resp.corpo.frete_total, 115 * 34);
+    assert.equal(resp.corpo.frete_total, 3910);
+    assert.equal(resp.corpo.valor_ton, Number((3910 / 33.63).toFixed(2)));
     assert.deepEqual(resp.corpo.notas, ['183191', '183192']);
-    assert.equal(resp.corpo.valor_por_nota, (115 * 34) / 2);
+    assert.equal(resp.corpo.valor_por_nota, 3910 / 2);
+    assert.ok(typeof resp.corpo.criado_em === 'string' && resp.corpo.criado_em.length > 0);
     freteId = resp.corpo.id;
   });
 
-  it('aceita frete_total informado manualmente (cobrança por peso real)', async () => {
+  it('mantém o valor_ton informado explicitamente (não recalcula)', async () => {
     const resp = await api('/api/fretes', {
       method: 'POST',
       body: JSON.stringify({
@@ -71,6 +73,7 @@ describe('fretes', () => {
     });
     assert.equal(resp.status, 201);
     assert.equal(resp.corpo.frete_total, 1527.3);
+    assert.equal(resp.corpo.valor_ton, 45);
   });
 
   it('aceita frete sem nota', async () => {
@@ -81,12 +84,14 @@ describe('fretes', () => {
         data: '2026-02-10',
         origem: 'Capinzal',
         destino: 'Joaçaba',
-        valor_ton: 43,
+        frete_total: 1462,
       }),
     });
     assert.equal(resp.status, 201);
     assert.deepEqual(resp.corpo.notas, []);
     assert.equal(resp.corpo.valor_por_nota, null);
+    // sem peso não há como derivar o R$/t
+    assert.equal(resp.corpo.valor_ton, null);
   });
 
   it('rejeita frete sem campos obrigatórios', async () => {
@@ -141,12 +146,13 @@ describe('fretes', () => {
         origem: 'Chapecó',
         destino: 'Joaçaba',
         peso_ton: 34.06,
-        valor_ton: 57,
+        frete_total: 1938,
         notas: ['174487'],
       }),
     });
     assert.equal(lancado.corpo.pendente_valor, false);
-    assert.equal(lancado.corpo.frete_total, 57 * 34);
+    assert.equal(lancado.corpo.frete_total, 1938);
+    assert.equal(lancado.corpo.valor_ton, Number((1938 / 34.06).toFixed(2)));
 
     const aposLancar = await api('/api/fretes?pendentes=1');
     assert.equal(aposLancar.corpo.length, 0);
@@ -173,7 +179,6 @@ describe('fretes', () => {
         origem: 'Concórdia',
         destino: 'Campo Alegre',
         peso_ton: 33.63,
-        valor_ton: 115,
         frete_total: 3910,
         notas: ['183191', '183192', '183193'],
       }),
