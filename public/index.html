@@ -146,16 +146,6 @@
     /* ---- Filtros ---- */
     .filtros { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
     .filtros .largura-toda { grid-column: 1 / -1; }
-    .resumo-kpis { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-    .mini-kpi {
-      border: 1px solid var(--borda); border-radius: 8px; padding: 5px 12px;
-      display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 100px;
-      background: var(--fundo);
-    }
-    .mini-kpi-rotulo { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--texto-suave); }
-    .mini-kpi-valor { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .mini-kpi.alerta { background: var(--alerta-fundo); border-color: var(--alerta-borda); }
-    .mini-kpi.alerta .mini-kpi-valor, .mini-kpi.alerta .mini-kpi-rotulo { color: var(--alerta); }
 
     /* ---- Lista: cartões no celular ---- */
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -204,9 +194,8 @@
       .acoes-form { flex-direction: row; align-items: center; }
       .acoes-form button { width: auto; min-width: 160px; }
       .filtros { grid-template-columns: 1fr 1fr auto; align-items: end; max-width: 640px; }
-      .kpis { grid-template-columns: repeat(4, 1fr); gap: 12px; }
-      .kpi-valor { font-size: 28px; }
-      .mini-kpi { flex: none; min-width: 150px; }
+      .kpis { grid-template-columns: repeat(5, 1fr); gap: 12px; }
+      .kpi-valor { font-size: 26px; }
       .filtros .largura-toda { grid-column: auto; }
       input, select, button { font-size: 14px; padding: 9px 10px; min-height: 40px; }
       table { border: none; }
@@ -290,12 +279,17 @@
 
     <div class="kpis">
       <div class="kpi">
-        <div class="kpi-topo"><span class="kpi-rotulo">Fretes no mês</span><span class="kpi-icone verde">🚚</span></div>
+        <div class="kpi-topo"><span class="kpi-rotulo">Fretes</span><span class="kpi-icone verde">🚚</span></div>
         <div class="kpi-valor" id="kpi-fretes">—</div>
-        <div class="kpi-delta" id="kpi-fretes-delta"></div>
+        <div class="kpi-delta" id="kpi-fretes-delta">no filtro atual</div>
       </div>
       <div class="kpi">
-        <div class="kpi-topo"><span class="kpi-rotulo">Faturamento no mês</span><span class="kpi-icone azul">💰</span></div>
+        <div class="kpi-topo"><span class="kpi-rotulo">Total</span><span class="kpi-icone azul">💵</span></div>
+        <div class="kpi-valor" id="kpi-total">—</div>
+        <div class="kpi-delta" id="kpi-total-delta">no filtro atual</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-topo"><span class="kpi-rotulo">Faturamento no mês</span><span class="kpi-icone verde">💰</span></div>
         <div class="kpi-valor" id="kpi-faturamento">—</div>
         <div class="kpi-delta" id="kpi-faturamento-delta"></div>
       </div>
@@ -334,20 +328,6 @@
           <select id="filtro-motorista"><option value="">Todos</option></select>
         </label>
         <button type="button" class="secundario largura-toda" id="limpar-filtros">Limpar filtros</button>
-      </div>
-      <div class="resumo-kpis" id="resumo">
-        <div class="mini-kpi">
-          <span class="mini-kpi-rotulo">Fretes</span>
-          <span class="mini-kpi-valor" id="resumo-fretes">—</span>
-        </div>
-        <div class="mini-kpi">
-          <span class="mini-kpi-rotulo">Total</span>
-          <span class="mini-kpi-valor" id="resumo-total">—</span>
-        </div>
-        <div class="mini-kpi alerta" id="resumo-pendentes-cartao" hidden>
-          <span class="mini-kpi-rotulo">Sem valor</span>
-          <span class="mini-kpi-valor" id="resumo-pendentes">0</span>
-        </div>
       </div>
       <div class="tabela-scroll">
         <table>
@@ -653,12 +633,13 @@
       fretesAtuais = await api('/api/fretes?' + parametros.toString());
       const corpo = document.getElementById('lista-fretes');
       const soma = fretesAtuais.reduce((total, f) => total + (f.frete_total ?? 0), 0);
-      const pendentesNoFiltro = fretesAtuais.filter((f) => f.pendente_valor).length;
-      document.getElementById('resumo-fretes').textContent =
+      const temFiltro = parametros.size > 0;
+      document.getElementById('kpi-fretes').textContent =
         new Intl.NumberFormat('pt-BR').format(fretesAtuais.length);
-      document.getElementById('resumo-total').textContent = fmtBRL.format(soma);
-      document.getElementById('resumo-pendentes').textContent = pendentesNoFiltro;
-      document.getElementById('resumo-pendentes-cartao').hidden = pendentesNoFiltro === 0;
+      document.getElementById('kpi-total').textContent = fmtBRL.format(soma);
+      const escopo = temFiltro ? 'no filtro atual' : 'todos os fretes';
+      document.getElementById('kpi-fretes-delta').textContent = escopo;
+      document.getElementById('kpi-total-delta').textContent = escopo;
 
       desenharTabela();
     }
@@ -908,9 +889,6 @@
     async function carregarResumo() {
       const r = await api('/api/resumo');
       const inteiro = new Intl.NumberFormat('pt-BR');
-      document.getElementById('kpi-fretes').textContent = inteiro.format(r.mes_atual.fretes);
-      document.getElementById('kpi-fretes-delta').innerHTML =
-        deltaHTML(r.mes_atual.fretes, r.mes_anterior.fretes, (v) => inteiro.format(v));
       document.getElementById('kpi-faturamento').textContent = fmtBRL.format(r.mes_atual.faturamento);
       document.getElementById('kpi-faturamento-delta').innerHTML =
         deltaHTML(r.mes_atual.faturamento, r.mes_anterior.faturamento, (v) => fmtBRL.format(v));
