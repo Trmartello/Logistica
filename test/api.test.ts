@@ -234,6 +234,17 @@ describe('busca global e resumo', () => {
     assert.equal(nada.corpo.length, 0);
   });
 
+  it('busca ignora acentos e caixa', async () => {
+    const semAcento = await api('/api/fretes?busca=joacaba');
+    assert.ok(semAcento.corpo.length >= 1);
+    assert.ok(semAcento.corpo.some((f: any) => f.origem === 'Joaçaba' || f.destino === 'Joaçaba'));
+
+    const comAcentoOutraCaixa = await api('/api/fretes?busca=CONCÓRDIA');
+    const semAcentoMinusculo = await api('/api/fretes?busca=concordia');
+    assert.equal(comAcentoOutraCaixa.corpo.length, semAcentoMinusculo.corpo.length);
+    assert.ok(semAcentoMinusculo.corpo.length >= 1);
+  });
+
   it('conta fretes com data fora do padrão em /api/opcoes', async () => {
     const antes = await api('/api/opcoes');
     const futuro = await api('/api/fretes', {
