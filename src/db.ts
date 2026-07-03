@@ -149,8 +149,19 @@ export function cadastrarLocaisDosFretes(db: DatabaseSync): void {
   `);
 }
 
+/** Remove acentos e caixa para comparações de busca (ex.: "conco" ↔ "CONCÓRDIA"). */
+export function semAcento(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+}
+
 export function createDb(path: string = caminhoPadraoBanco()): DatabaseSync {
   const db = new DatabaseSync(path);
+  db.function('sem_acento', { deterministic: true }, (t: unknown) =>
+    t == null ? null : semAcento(String(t))
+  );
   db.exec('PRAGMA foreign_keys = ON;');
   if (path !== ':memory:') {
     db.exec('PRAGMA journal_mode = WAL;');

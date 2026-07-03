@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { DatabaseSync } from 'node:sqlite';
+import { semAcento } from '../db.js';
 
 interface Frete {
   id: number;
@@ -122,9 +123,11 @@ export function rotasFretes(db: DatabaseSync): Router {
     const parametros: string[] = [];
 
     if (typeof busca === 'string' && busca.trim() !== '') {
-      const termo = `%${busca.trim()}%`;
+      // Busca sem distinção de acentos ou caixa: "conco" encontra "CONCÓRDIA"
+      const termo = `%${semAcento(busca.trim())}%`;
       condicoes.push(
-        `(f.motorista LIKE ? OR f.placa_cc LIKE ? OR f.origem LIKE ? OR f.destino LIKE ?
+        `(sem_acento(f.motorista) LIKE ? OR sem_acento(f.placa_cc) LIKE ?
+          OR sem_acento(f.origem) LIKE ? OR sem_acento(f.destino) LIKE ?
           OR f.id IN (SELECT frete_id FROM notas WHERE numero LIKE ?))`
       );
       parametros.push(termo, termo, termo, termo, termo);
