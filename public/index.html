@@ -182,6 +182,15 @@
     tr.frete.pendente { border-left: 4px solid #e3a008; }
     .notas-celula { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
     .vazio { color: var(--texto-suave); padding: 24px; text-align: center; display: block; }
+    .paginacao {
+      display: flex; gap: 10px; align-items: center; justify-content: center;
+      margin-top: 10px; flex-wrap: wrap;
+    }
+    .paginacao button { width: auto; min-width: 110px; font-size: 13px; padding: 8px 12px; }
+    .paginacao button:disabled { opacity: 0.4; cursor: default; }
+    #pag-info { font-size: 13px; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+    .pag-tamanho { flex-direction: row; align-items: center; gap: 6px; font-size: 12px; }
+    .pag-tamanho select { width: auto; min-height: 36px; padding: 6px 8px; font-size: 13px; }
 
     /* ---- Desktop (≥ 800px): tela inteira, formulário em grade e lista em tabela ---- */
     @media (min-width: 800px) {
@@ -337,6 +346,19 @@
           <tbody id="lista-fretes"></tbody>
         </table>
       </div>
+      <div class="paginacao" id="paginacao">
+        <button type="button" class="secundario" id="pag-anterior">‹ Anterior</button>
+        <span id="pag-info"></span>
+        <button type="button" class="secundario" id="pag-proxima">Próxima ›</button>
+        <label class="pag-tamanho">Por página
+          <select id="pag-tamanho">
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="0">Todos</option>
+          </select>
+        </label>
+      </div>
     </section>
 
     <dialog id="modal-importar">
@@ -397,6 +419,7 @@
     const fmtNum = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
     let fretesAtuais = [];
     let somentePendentes = false;
+    let paginaAtual = 1;
     const dinheiro = (v) => (v != null ? fmtBRL.format(v) : '—');
 
     // --- Colunas da lista: visibilidade e ordenação configuráveis ---
@@ -422,13 +445,14 @@
     ];
     const CHAVE_PREFS = 'fretes-prefs-v1';
     const prefs = (() => {
-      const padrao = { visiveis: COLUNAS.map((c) => c.chave), ordenacao: { chave: 'data', direcao: 'desc' }, larguras: {} };
+      const padrao = { visiveis: COLUNAS.map((c) => c.chave), ordenacao: { chave: 'data', direcao: 'desc' }, larguras: {}, porPagina: 50 };
       try {
         const salvo = JSON.parse(localStorage.getItem(CHAVE_PREFS));
         if (salvo && Array.isArray(salvo.visiveis) && salvo.ordenacao) {
           salvo.visiveis = salvo.visiveis.filter((v) => COLUNAS.some((c) => c.chave === v));
           if (!COLUNAS.some((c) => c.chave === salvo.ordenacao.chave)) salvo.ordenacao = padrao.ordenacao;
           salvo.larguras = salvo.larguras && typeof salvo.larguras === 'object' ? salvo.larguras : {};
+          if (![0, 25, 50, 100].includes(salvo.porPagina)) salvo.porPagina = padrao.porPagina;
           return salvo;
         }
       } catch (_) {}
@@ -631,6 +655,7 @@
       if (somentePendentes) parametros.set('pendentes', '1');
 
       fretesAtuais = await api('/api/fretes?' + parametros.toString());
+      paginaAtual = 1;
       const corpo = document.getElementById('lista-fretes');
       const soma = fretesAtuais.reduce((total, f) => total + (f.frete_total ?? 0), 0);
       const temFiltro = parametros.size > 0;
@@ -659,10 +684,26 @@
       const corpo = document.getElementById('lista-fretes');
       if (fretesAtuais.length === 0) {
         corpo.innerHTML = `<tr><td colspan="${visiveis.length + 1}" class="vazio sem-rotulo">Nenhum frete encontrado</td></tr>`;
+        document.getElementById('paginacao').hidden = true;
         return;
       }
       const ordenados = [...fretesAtuais].sort(compararFretes);
-      corpo.innerHTML = ordenados.map((f) => `
+
+      // Paginação
+      const tamanho = prefs.porPagina;
+      const totalPaginas = tamanho > 0 ? Math.max(1, Math.ceil(ordenados.length / tamanho)) : 1;
+      paginaAtual = Math.min(Math.max(1, paginaAtual), totalPaginas);
+      const inicio = tamanho > 0 ? (paginaAtual - 1) * tamanho : 0;
+      const pagina = tamanho > 0 ? ordenados.slice(inicio, inicio + tamanho) : ordenados;
+      const fmtInt = new Intl.NumberFormat('pt-BR');
+      document.getElementById('paginacao').hidden = false;
+      document.getElementById('pag-info').textContent =
+        `${fmtInt.format(inicio + 1)}–${fmtInt.format(inicio + pagina.length)} de ${fmtInt.format(ordenados.length)}`;
+      document.getElementById('pag-anterior').disabled = paginaAtual <= 1;
+      document.getElementById('pag-proxima').disabled = paginaAtual >= totalPaginas;
+      document.getElementById('pag-tamanho').value = String(tamanho);
+
+      corpo.innerHTML = pagina.map((f) => `
         <tr class="frete${f.pendente_valor ? ' pendente' : ''}">
           ${visiveis.map((c) => `<td data-rotulo="${c.rotulo}" class="${c.num ? 'num ' : ''}${c.classe ?? ''}">${c.desenhar(f)}</td>`).join('')}
           <td class="celula-acoes sem-rotulo">
@@ -721,8 +762,27 @@
       } else {
         prefs.ordenacao = { chave, direcao: 'asc' };
       }
+      paginaAtual = 1;
       salvarPrefs();
       sincronizarPainelColunas();
+      desenharTabela();
+    });
+
+    // --- Controles de paginação ---
+    document.getElementById('pag-anterior').addEventListener('click', () => {
+      paginaAtual--;
+      desenharTabela();
+      document.querySelector('.tabela-scroll').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    document.getElementById('pag-proxima').addEventListener('click', () => {
+      paginaAtual++;
+      desenharTabela();
+      document.querySelector('.tabela-scroll').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    document.getElementById('pag-tamanho').addEventListener('change', (ev) => {
+      prefs.porPagina = Number(ev.target.value);
+      paginaAtual = 1;
+      salvarPrefs();
       desenharTabela();
     });
 
