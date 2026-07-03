@@ -234,6 +234,22 @@ describe('busca global e resumo', () => {
     assert.equal(nada.corpo.length, 0);
   });
 
+  it('conta fretes com data fora do padrão em /api/opcoes', async () => {
+    const antes = await api('/api/opcoes');
+    const futuro = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({ motorista: 'Datas', data: '2031-12-29', origem: 'A', destino: 'B', frete_total: 100 }),
+    });
+    const antigo = await api('/api/fretes', {
+      method: 'POST',
+      body: JSON.stringify({ motorista: 'Datas', data: '2006-01-12', origem: 'A', destino: 'B', frete_total: 100 }),
+    });
+    const depois = await api('/api/opcoes');
+    assert.equal(depois.corpo.datas_suspeitas, antes.corpo.datas_suspeitas + 2);
+    await api(`/api/fretes/${futuro.corpo.id}`, { method: 'DELETE' });
+    await api(`/api/fretes/${antigo.corpo.id}`, { method: 'DELETE' });
+  });
+
   it('retorna os KPIs do painel', async () => {
     const resp = await api('/api/resumo');
     assert.equal(resp.status, 200);

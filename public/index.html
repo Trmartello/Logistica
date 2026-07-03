@@ -179,6 +179,12 @@
       display: inline-block; background: var(--alerta-fundo); border: 1px solid var(--alerta-borda); color: var(--alerta);
       border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; white-space: nowrap;
     }
+    .badge-data {
+      display: inline-grid; place-items: center; width: 18px; height: 18px;
+      background: var(--alerta-fundo); border: 1px solid var(--alerta-borda); color: var(--alerta);
+      border-radius: 50%; font-size: 11px; font-weight: 700; margin-left: 4px; cursor: help;
+      vertical-align: middle;
+    }
     tr.frete.pendente { border-left: 4px solid #e3a008; }
     .notas-celula { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
     .vazio { color: var(--texto-suave); padding: 24px; text-align: center; display: block; }
@@ -328,6 +334,7 @@
         <button type="button" data-chip="mes-atual">Este mês</button>
         <button type="button" data-chip="mes-anterior">Mês passado</button>
         <button type="button" data-chip="pendentes" class="chip-alerta" id="chip-pendentes">⚠ Sem valor lançado</button>
+        <button type="button" data-chip="datas" class="chip-alerta" id="chip-datas" hidden>📅 Datas a corrigir</button>
       </div>
       <div class="filtros">
         <label>Mês
@@ -419,12 +426,18 @@
     const fmtNum = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
     let fretesAtuais = [];
     let somentePendentes = false;
+    let somenteDatasSuspeitas = false;
     let paginaAtual = 1;
     const dinheiro = (v) => (v != null ? fmtBRL.format(v) : '—');
 
     // --- Colunas da lista: visibilidade e ordenação configuráveis ---
     const COLUNAS = [
-      { chave: 'data', rotulo: 'Data', desenhar: (f) => dataBR(f.data) },
+      {
+        chave: 'data', rotulo: 'Data',
+        desenhar: (f) => dataBR(f.data) + (dataSuspeita(f)
+          ? ' <span class="badge-data" title="Data fora do padrão (futura ou muito antiga) — clique em ✏️ para corrigir">⚠</span>'
+          : ''),
+      },
       { chave: 'motorista', rotulo: 'Motorista', desenhar: (f) => f.motorista },
       { chave: 'placa_cc', rotulo: 'Placa / CC', desenhar: (f) => f.placa_cc ?? '—' },
       { chave: 'origem', rotulo: 'Origem', desenhar: (f) => f.origem },
@@ -465,6 +478,12 @@
 
     function compararFretes(a, b) {
       const coluna = COLUNAS.find((c) => c.chave === prefs.ordenacao.chave) ?? COLUNAS[0];
+      // Ao ordenar por Data, registros com data fora do padrão vêm primeiro
+      // (em qualquer direção) para facilitar a correção.
+      if (coluna.chave === 'data') {
+        const suspeitaA = dataSuspeita(a), suspeitaB = dataSuspeita(b);
+        if (suspeitaA !== suspeitaB) return suspeitaA ? -1 : 1;
+      }
       const pegar = coluna.valorOrdenacao ?? ((f) => f[coluna.chave]);
       const va = pegar(a), vb = pegar(b);
       if (va == null && vb == null) return b.id - a.id;
@@ -493,15 +512,19 @@
 
     function dataBR(iso) {
       const [a, m, d] = iso.split('-');
-      return `${d}/${m}/${a.slice(2)}`;
+      return `${d}/${m}/${a}`;
     }
 
     function dataHoraBR(sql) {
       if (!sql) return '—';
       const d = new Date(sql.replace(' ', 'T') + 'Z');
-      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
         ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     }
+
+    // Data fora do padrão: no futuro ou anterior a 2020 (erro de digitação na origem)
+    const hojeISO = new Date().toISOString().slice(0, 10);
+    const dataSuspeita = (f) => f.data > hojeISO || f.data < '2020-01-01';
 
     // --- Modal ---
     const modal = document.getElementById('modal-frete');
@@ -637,6 +660,10 @@
       chipPendentes.textContent = opcoes.fretes_pendentes > 0
         ? `⚠ Sem valor lançado (${opcoes.fretes_pendentes})`
         : '⚠ Sem valor lançado';
+      const chipDatas = document.getElementById('chip-datas');
+      chipDatas.hidden = !(opcoes.datas_suspeitas > 0);
+      chipDatas.textContent = `📅 Datas a corrigir (${opcoes.datas_suspeitas})`;
+      chipDatas.title = 'Fretes com data fora do padrão (futura ou muito antiga) — clique para listá-los e corrigir';
       const selecao = document.getElementById('filtro-motorista');
       const atual = selecao.value;
       selecao.innerHTML = '<option value="">Todos</option>' + opcoes.motoristas
@@ -655,10 +682,11 @@
       if (somentePendentes) parametros.set('pendentes', '1');
 
       fretesAtuais = await api('/api/fretes?' + parametros.toString());
+      if (somenteDatasSuspeitas) fretesAtuais = fretesAtuais.filter(dataSuspeita);
       paginaAtual = 1;
       const corpo = document.getElementById('lista-fretes');
       const soma = fretesAtuais.reduce((total, f) => total + (f.frete_total ?? 0), 0);
-      const temFiltro = parametros.size > 0;
+      const temFiltro = parametros.size > 0 || somenteDatasSuspeitas;
       document.getElementById('kpi-fretes').textContent =
         new Intl.NumberFormat('pt-BR').format(fretesAtuais.length);
       document.getElementById('kpi-total').textContent = fmtBRL.format(soma);
@@ -859,6 +887,7 @@
       document.getElementById('filtro-mes').value = '';
       document.getElementById('filtro-motorista').value = '';
       somentePendentes = false;
+      somenteDatasSuspeitas = false;
       atualizarChips();
       carregarFretes();
     });
@@ -915,13 +944,15 @@
     };
     function atualizarChips() {
       const mes = document.getElementById('filtro-mes').value;
+      const semExtras = !somentePendentes && !somenteDatasSuspeitas;
       document.querySelectorAll('#chips button').forEach((b) => {
         const chip = b.dataset.chip;
         const ativo =
-          (chip === 'todos' && !mes && !somentePendentes) ||
-          (chip === 'mes-atual' && mes === mesISO(0) && !somentePendentes) ||
-          (chip === 'mes-anterior' && mes === mesISO(-1) && !somentePendentes) ||
-          (chip === 'pendentes' && somentePendentes);
+          (chip === 'todos' && !mes && semExtras) ||
+          (chip === 'mes-atual' && mes === mesISO(0) && semExtras) ||
+          (chip === 'mes-anterior' && mes === mesISO(-1) && semExtras) ||
+          (chip === 'pendentes' && somentePendentes) ||
+          (chip === 'datas' && somenteDatasSuspeitas);
         b.classList.toggle('ativo', ativo);
       });
     }
@@ -931,6 +962,7 @@
       const chip = botao.dataset.chip;
       const filtroMes = document.getElementById('filtro-mes');
       somentePendentes = chip === 'pendentes' ? !somentePendentes : false;
+      somenteDatasSuspeitas = chip === 'datas' ? !somenteDatasSuspeitas : false;
       if (chip === 'todos') filtroMes.value = '';
       if (chip === 'mes-atual') filtroMes.value = mesISO(0);
       if (chip === 'mes-anterior') filtroMes.value = mesISO(-1);
