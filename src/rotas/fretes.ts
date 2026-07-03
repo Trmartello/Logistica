@@ -326,6 +326,12 @@ export function rotaOpcoes(db: DatabaseSync): Router {
     const pendentes = db
       .prepare('SELECT COUNT(*) AS total FROM fretes WHERE frete_total IS NULL')
       .get() as { total: number };
+    // Datas fora do padrão: no futuro ou anteriores a 2020 (erros de digitação)
+    const datasSuspeitas = db
+      .prepare(
+        "SELECT COUNT(*) AS total FROM fretes WHERE data > date('now') OR data < '2020-01-01'"
+      )
+      .get() as { total: number };
     // Origem/destino: filiais primeiro, depois municípios-UF e, por fim,
     // os locais personalizados cadastrados pelos usuários.
     const locais = coluna(
@@ -341,6 +347,7 @@ export function rotaOpcoes(db: DatabaseSync): Router {
       ),
       cidades: locais,
       fretes_pendentes: pendentes.total,
+      datas_suspeitas: datasSuspeitas.total,
     });
   });
   return router;
